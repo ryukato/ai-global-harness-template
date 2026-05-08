@@ -79,3 +79,15 @@ graphify-out/
 ```
 
 When `graphify-out/GRAPH_REPORT.md` exists, agents should use it as a repository navigation aid before broad search.
+
+## Usage Pattern
+
+- Graphify is optional.
+- If enabled for a project, use it before and after significant structural changes when practical.
+- Store generated graph output under `graphify-out/`.
+- Do not commit large generated cache files unless the repository intentionally tracks them.
+- If Graphify cannot run, report:
+  - command attempted
+  - error summary
+  - likely cause
+  - recommended follow-up

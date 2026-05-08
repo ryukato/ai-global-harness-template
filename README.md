@@ -35,6 +35,16 @@ docs/codex/code-review.md
 docs/codex/done-definition.md
   Completion criteria.
 
+docs/codex/general-scaffold-principles.md
+  Project-agnostic scaffold, safety, naming, and verification principles.
+
+docs/codex/monorepo-layout.md
+docs/codex/backend-architecture-boundaries.md
+docs/codex/frontend-structure.md
+docs/codex/proxy-bff-pattern.md
+docs/codex/shared-contracts.md
+  Optional reusable structure guidance for projects that select those patterns.
+
 scripts/codex/verify.sh
   Stack-aware verification entrypoint.
 
@@ -128,6 +138,17 @@ docs/codex/project-context.md
 ```
 
 to describe the target project.
+
+For scaffold and architecture guidance, also review:
+
+```text
+docs/codex/general-scaffold-principles.md
+docs/codex/monorepo-layout.md
+docs/codex/backend-architecture-boundaries.md
+docs/codex/frontend-structure.md
+docs/codex/proxy-bff-pattern.md
+docs/codex/shared-contracts.md
+```
 
 
 
@@ -249,6 +270,20 @@ pnpm/npm/yarn depending on lockfile
 It does not warn about Python, Poetry, uv, Java, Gradle, or Maven unless the project is installed with a matching profile or uses `mixed`/`auto`.
 
 Graphify is optional and checked only when `--graphify` is provided.
+
+
+## General Scaffold Guidance
+
+The harness templates capture reusable setup rules without assuming a product domain:
+
+- Read `AGENTS.md`, `docs/codex/project-context.md`, and listed project references before inferring architecture.
+- Preserve existing files; safe installs write conflicts as `*.harness-new`.
+- Keep scaffolds minimal but explicit, with README files for runnable apps and shared packages.
+- Use `apps/`, `packages/` or `libs/`, `scripts/codex/`, and `docs/codex/` when those directories fit the project.
+- Use explicit `Request` and `Response` contract names. Do not use `DTO` naming in generated scaffolds.
+- Treat proxy/BFF-lite, Ports & Adapters, Graphify, and fullstack layouts as optional patterns selected by project context or profile.
+
+An optional fullstack proxy profile is intentionally deferred for now. The reusable rules are documented in the template docs, but the current supported profiles remain language- or build-tool-oriented so existing behavior stays predictable.
 
 
 

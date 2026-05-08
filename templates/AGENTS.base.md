@@ -12,11 +12,15 @@ docs/codex/project-context.md
 
 ## Operating Principles
 
+- Work context-first: read repository guidance before inferring architecture or conventions.
 - Keep changes small, focused, and reversible.
 - Do not modify unrelated files.
 - Do not introduce new runtime dependencies unless explicitly requested.
 - Preserve existing public APIs, data contracts, and behavior unless the task explicitly asks to change them.
+- Preserve existing files and directories. Do not overwrite or delete project files silently.
 - Prefer clear, boring, maintainable code over clever abstractions.
+- Do not add product/business features unless the task explicitly asks for them.
+- Do not add infrastructure such as databases, migrations, Docker, CI, auth, queues, object storage, LLM, OCR, RAG, or vector database integration unless explicitly requested or selected by the project profile.
 - Explain important trade-offs in the final report.
 - Be honest about verification failures and unresolved risks.
 
@@ -27,9 +31,12 @@ Before making changes:
 1. Read the task carefully.
 2. Read this file.
 3. Read `docs/codex/project-context.md` when it exists.
-4. Inspect directly related files.
-5. Check nearby tests, types, schemas, migrations, and docs.
-6. Identify the minimum safe change set.
+4. Read project reference documents listed in `docs/codex/project-context.md` when they exist.
+5. Inspect directly related files.
+6. Check nearby tests, types, schemas, migrations, and docs.
+7. Identify the minimum safe change set.
+
+Do not infer project structure, architecture, dependency direction, product scope, or domain rules without checking repository documents first.
 
 ## Repository Hygiene
 
@@ -39,6 +46,7 @@ Before making changes:
 - Do not perform broad formatting changes unrelated to the task.
 - Do not rename files or move modules unless the task requires it.
 - Do not change package managers or build tools unless explicitly requested.
+- In existing projects, use safe install or backup behavior where available. Prefer `*.harness-new` conflict output over silent overwrite.
 
 Common generated/dependency paths to avoid:
 
@@ -62,6 +70,8 @@ graphify-out/cache/
 ## Code Quality Rules
 
 - Keep types explicit where practical.
+- Do not use `DTO` terminology in generated names.
+- Use explicit `Request` and `Response` naming for API contracts and shared contract files.
 - Avoid duplicated literals when they represent shared semantics.
 - Extract constants by meaning, not by value.
 - Keep validation, transformation, and domain decision logic separated where practical.
@@ -76,6 +86,8 @@ graphify-out/cache/
 - Keep domain/business logic out of thin transport/controller layers.
 - Keep persistence details out of domain objects.
 - Keep infrastructure concerns at boundaries.
+- For scaffold work, keep structure minimal but explicit. Each runnable app or shared package should explain its purpose, local run command, test command, verification command, and boundaries in a README when practical.
+- Do not force a framework, proxy layer, Ports & Adapters layout, or monorepo shape onto a project unless the selected profile or repository context calls for it.
 - Update relevant docs when changing behavior, API, setup, or operational flows.
 
 ## Verification

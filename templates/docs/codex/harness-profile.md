@@ -29,6 +29,8 @@ docs-only
 auto
 ```
 
+Profiles are intentionally generic. Optional fullstack layouts such as `apps/api`, `apps/web`, `apps/proxy-api`, and `packages/shared-contracts` should be selected by project context or a future explicit profile, not assumed for every project.
+
 ## Bootstrap Behavior
 
 `bootstrap.sh --check` checks only profile-relevant tools.

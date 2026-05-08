@@ -10,7 +10,13 @@ TODO: Describe what this project does.
 
 ## Stack
 
-TODO: Select and describe the stack.
+TODO: Select and describe the stack and harness profile.
+
+Selected harness profile:
+
+```text
+TODO: typescript | python-poetry | python-uv | jvm-gradle-java | jvm-gradle-kotlin | jvm-maven-java | jvm-maven-kotlin | mixed | docs-only | auto
+```
 
 Examples:
 
@@ -25,6 +31,44 @@ Examples:
 
 ```text
 TODO: Add the important directories.
+```
+
+## App / Package Layout
+
+TODO: List runnable apps and shared packages.
+
+Example:
+
+```text
+apps/api                 TODO: purpose
+apps/web                 TODO: purpose
+apps/proxy-api           TODO: optional; only if this project uses a proxy/BFF-lite layer
+packages/shared-contracts TODO: optional shared request/response contracts
+libs/common              TODO: optional shared library
+```
+
+## Architecture Boundaries
+
+TODO: Describe boundaries the agents must preserve.
+
+Examples:
+
+- Domain/application logic:
+- Inbound adapters such as HTTP routes, CLIs, workers:
+- Outbound adapters such as DB, external APIs, object storage, HTTP clients:
+- Config/env access:
+- Shared utilities:
+
+## Dependency Direction
+
+TODO: Describe allowed dependency direction.
+
+Examples:
+
+```text
+web -> proxy-api -> api
+shared packages -> no dependency on runnable apps
+api/domain -> no dependency on framework or infrastructure adapters
 ```
 
 ## Important Commands
@@ -46,7 +90,58 @@ TODO: Add domain rules that agents must not infer incorrectly.
 
 ## API / Contract Notes
 
-TODO: Add API compatibility requirements, DTO conventions, schema rules, or migration policies.
+TODO: Add API compatibility requirements, Request/Response naming conventions, schema rules, or migration policies.
+
+Default scaffold naming rule:
+
+- Do not use `DTO` terminology in generated names.
+- Use explicit `Request` and `Response` names.
+
+## Root Version Policy
+
+TODO: Describe root-level version conventions.
+
+Examples:
+
+- Python version is declared at root `.python-version`.
+- Python sub-apps inherit the root Python version unless explicitly documented.
+- Node package manager is chosen by the existing lockfile or workspace config.
+
+## Optional Proxy / BFF-Lite Usage
+
+TODO: State whether this project uses a proxy/BFF-lite layer.
+
+If enabled, document:
+
+- Proxy app path:
+- Backend base URL environment variable:
+- Browser-facing API prefix:
+- Dependency direction:
+
+If disabled, agents should not add proxy infrastructure unless explicitly requested.
+
+## Optional Graphify Usage
+
+TODO: State whether Graphify is used for repository mapping.
+
+If enabled:
+
+- Store graph output under `graphify-out/`.
+- Use Graphify before and after significant structural changes when practical.
+- Do not commit large cache output unless intentionally tracked.
+
+If Graphify cannot run, report the command attempted, error summary, likely cause, and recommended follow-up.
+
+## Language Server Tooling
+
+TODO: List selected language server, linter, formatter, and type checker tooling.
+
+Examples:
+
+- TypeScript: `tsc`, `eslint`, `typescript-language-server`, `prettier`
+- Python: `ruff`, `pyright`, `mypy`
+- JVM Java: `jdtls`
+- JVM Kotlin: `kotlin-language-server`, `ktlint`
 
 ## Generated Files / Paths to Avoid
 
@@ -54,7 +149,34 @@ TODO: Add API compatibility requirements, DTO conventions, schema rules, or migr
 TODO
 ```
 
+Common examples:
+
+```text
+dist/
+build/
+coverage/
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+target/
+.gradle/
+*.tsbuildinfo
+graphify-out/cache/
+```
+
+## Additional Project References
+
+TODO: List project reference documents agents must read before architecture-sensitive work.
+
+```text
+docs/project/TODO.md
+```
+
 ## Agent Notes
 
 - Prefer small changes.
 - Update this file when new project-specific rules become stable.
+- Do not infer architecture without checking this file and the references above.

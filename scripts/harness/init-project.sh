@@ -55,6 +55,32 @@ init_typescript() {
 
   mkdir -p "$TARGET_DIR"/{apps/backend/src,apps/frontend/src,libs/types/src,libs/utils/src}
 
+  write_file "$TARGET_DIR/README.md" '# TypeScript Harness Scaffold
+
+## Layout
+
+- `apps/backend`: runnable backend-style TypeScript app placeholder.
+- `apps/frontend`: runnable frontend-style TypeScript app placeholder.
+- `libs/types`: shared request/response and contract types.
+- `libs/utils`: shared internal utilities.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+pnpm install
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep runnable app code in `apps/`. Keep shared contracts and utilities in `libs/`. Use explicit `Request` and `Response` names for API contracts; do not use `DTO` naming.
+'
+
   write_file "$TARGET_DIR/package.json" '{
   "name": "ai-harness-typescript-monorepo",
   "version": "0.1.0",
@@ -179,7 +205,49 @@ const response: HealthCheckResponse = {
 
 console.log(formatMessage(\`$app:\${response.status}\`));
 "
+
+    write_file "$TARGET_DIR/apps/$app/README.md" "# $app
+
+## Purpose
+
+Runnable TypeScript app placeholder.
+
+## Commands
+
+\`\`\`bash
+pnpm --dir apps/$app run lint
+pnpm --dir apps/$app run typecheck
+pnpm --dir apps/$app run test
+pnpm --dir apps/$app run build
+./scripts/codex/verify.sh
+\`\`\`
+
+## Boundaries
+
+Keep app-specific code here. Move shared request/response contracts and reusable utilities into workspace libraries.
+"
   done
+
+  write_file "$TARGET_DIR/libs/types/README.md" '# Shared Types
+
+## Purpose
+
+Shared TypeScript request/response and contract types.
+
+## Commands
+
+```bash
+pnpm --dir libs/types run lint
+pnpm --dir libs/types run typecheck
+pnpm --dir libs/types run test
+pnpm --dir libs/types run build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Use explicit `Request` and `Response` names. Do not use `DTO` naming. This library should not depend on runnable apps.
+'
 
   write_file "$TARGET_DIR/libs/types/package.json" '{
   "name": "@repo/types",
@@ -241,6 +309,27 @@ export type HealthCheckResponse = {
 }
 '
 
+  write_file "$TARGET_DIR/libs/utils/README.md" '# Shared Utilities
+
+## Purpose
+
+Shared internal utility functions.
+
+## Commands
+
+```bash
+pnpm --dir libs/utils run lint
+pnpm --dir libs/utils run typecheck
+pnpm --dir libs/utils run test
+pnpm --dir libs/utils run build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep reusable, dependency-light helpers here. Do not add app-specific behavior or generated output.
+'
+
   write_file "$TARGET_DIR/.gitignore" 'node_modules/
 dist/
 coverage/
@@ -257,6 +346,33 @@ init_python_poetry() {
   echo "Initializing Python Poetry monorepo-style scaffold"
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/api,libs/common/src/common,tests}
+
+  write_file "$TARGET_DIR/README.md" '# Python Poetry Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable Python app placeholder.
+- `libs/common`: shared internal Python library.
+- `tests`: root verification tests.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+poetry install
+poetry check
+poetry run ruff check .
+poetry run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable utilities in `libs/`. Add framework or infrastructure integrations only when explicitly requested.
+'
+
+  write_file "$TARGET_DIR/.python-version" '3.12
+'
 
   write_file "$TARGET_DIR/pyproject.toml" '[tool.poetry]
 name = "ai-harness-python-poetry"
@@ -291,6 +407,25 @@ build-backend = "poetry.core.masonry.api"
 '
 
   write_file "$TARGET_DIR/apps/api/src/api/__init__.py" ''
+  write_file "$TARGET_DIR/apps/api/README.md" '# API App
+
+## Purpose
+
+Runnable Python app placeholder.
+
+## Commands
+
+```bash
+poetry run python -c "from api.main import health_check; print(health_check())"
+poetry run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific application code here. Keep reusable helpers in `libs/common`. Keep external infrastructure details outside pure logic.
+'
+
   write_file "$TARGET_DIR/apps/api/src/api/main.py" 'from common.formatting import format_message
 
 
@@ -299,6 +434,24 @@ def health_check() -> dict[str, str]:
 '
 
   write_file "$TARGET_DIR/libs/common/src/common/__init__.py" ''
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Library
+
+## Purpose
+
+Shared internal Python utilities.
+
+## Commands
+
+```bash
+poetry run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep this library reusable and dependency-light. Do not import runnable apps from shared libraries.
+'
+
   write_file "$TARGET_DIR/libs/common/src/common/formatting.py" 'def format_message(message: str) -> str:
     return f"[ai-harness] {message}"
 '
@@ -328,6 +481,32 @@ init_python_uv() {
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/api,libs/common/src/common,tests}
 
+  write_file "$TARGET_DIR/README.md" '# Python uv Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable Python app placeholder.
+- `libs/common`: shared internal Python library.
+- `tests`: root verification tests.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+uv sync
+uv run ruff check .
+uv run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable utilities in `libs/`. Add framework or infrastructure integrations only when explicitly requested.
+'
+
+  write_file "$TARGET_DIR/.python-version" '3.12
+'
+
   write_file "$TARGET_DIR/pyproject.toml" '[project]
 name = "ai-harness-python-uv"
 version = "0.1.0"
@@ -356,6 +535,25 @@ mypy_path = "apps/api/src:libs/common/src"
 '
 
   write_file "$TARGET_DIR/apps/api/src/api/__init__.py" ''
+  write_file "$TARGET_DIR/apps/api/README.md" '# API App
+
+## Purpose
+
+Runnable Python app placeholder.
+
+## Commands
+
+```bash
+uv run python -c "from api.main import health_check; print(health_check())"
+uv run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific application code here. Keep reusable helpers in `libs/common`. Keep external infrastructure details outside pure logic.
+'
+
   write_file "$TARGET_DIR/apps/api/src/api/main.py" 'from common.formatting import format_message
 
 
@@ -364,6 +562,24 @@ def health_check() -> dict[str, str]:
 '
 
   write_file "$TARGET_DIR/libs/common/src/common/__init__.py" ''
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Library
+
+## Purpose
+
+Shared internal Python utilities.
+
+## Commands
+
+```bash
+uv run pytest
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep this library reusable and dependency-light. Do not import runnable apps from shared libraries.
+'
+
   write_file "$TARGET_DIR/libs/common/src/common/formatting.py" 'def format_message(message: str) -> str:
     return f"[ai-harness] {message}"
 '
@@ -392,6 +608,27 @@ init_jvm_gradle_kotlin() {
   echo "Initializing JVM Gradle Kotlin multi-module scaffold"
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/main/kotlin/com/example/api,apps/api/src/test/kotlin/com/example/api,libs/common/src/main/kotlin/com/example/common}
+
+  write_file "$TARGET_DIR/README.md" '# JVM Gradle Kotlin Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable JVM app module placeholder.
+- `libs/common`: shared JVM library module.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+./gradlew test
+./gradlew build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable code in `libs/`. Shared libraries should not depend on runnable apps.
+'
 
   write_file "$TARGET_DIR/settings.gradle.kts" 'pluginManagement {
     repositories {
@@ -444,9 +681,45 @@ tasks.test {
 }
 '
 
+  write_file "$TARGET_DIR/apps/api/README.md" '# API Module
+
+## Purpose
+
+Runnable JVM app module placeholder.
+
+## Commands
+
+```bash
+./gradlew :apps:api:test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code here. Move reusable code into shared modules.
+'
+
   write_file "$TARGET_DIR/libs/common/build.gradle.kts" 'plugins {
     kotlin("jvm")
 }
+'
+
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Module
+
+## Purpose
+
+Shared JVM library module.
+
+## Commands
+
+```bash
+./gradlew :libs:common:build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep reusable, dependency-light code here. Do not depend on runnable app modules.
 '
 
   write_file "$TARGET_DIR/libs/common/src/main/kotlin/com/example/common/Formatting.kt" 'package com.example.common
@@ -489,6 +762,27 @@ init_jvm_gradle_java() {
   echo "Initializing JVM Gradle Java multi-module scaffold"
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/main/java/com/example/api,apps/api/src/test/java/com/example/api,libs/common/src/main/java/com/example/common}
+
+  write_file "$TARGET_DIR/README.md" '# JVM Gradle Java Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable JVM app module placeholder.
+- `libs/common`: shared JVM library module.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+./gradlew test
+./gradlew build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable code in `libs/`. Shared libraries should not depend on runnable apps.
+'
 
   write_file "$TARGET_DIR/settings.gradle.kts" 'pluginManagement {
     repositories {
@@ -539,7 +833,43 @@ subprojects {
 }
 '
 
+  write_file "$TARGET_DIR/apps/api/README.md" '# API Module
+
+## Purpose
+
+Runnable JVM app module placeholder.
+
+## Commands
+
+```bash
+./gradlew :apps:api:test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code here. Move reusable code into shared modules.
+'
+
   write_file "$TARGET_DIR/libs/common/build.gradle.kts" ''
+
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Module
+
+## Purpose
+
+Shared JVM library module.
+
+## Commands
+
+```bash
+./gradlew :libs:common:build
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep reusable, dependency-light code here. Do not depend on runnable app modules.
+'
 
   write_file "$TARGET_DIR/libs/common/src/main/java/com/example/common/Formatting.java" 'package com.example.common;
 
@@ -597,6 +927,29 @@ init_jvm_maven_java() {
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/main/java/com/example/api,apps/api/src/test/java/com/example/api,libs/common/src/main/java/com/example/common}
 
+  write_file "$TARGET_DIR/README.md" '# JVM Maven Java Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable JVM app module placeholder.
+- `libs/common`: shared JVM library module.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+./mvnw test
+./mvnw package
+./scripts/codex/verify.sh
+```
+
+If no Maven wrapper exists, use `mvn test`.
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable code in `libs/`. Shared libraries should not depend on runnable apps.
+'
+
   write_file "$TARGET_DIR/pom.xml" '<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -647,6 +1000,24 @@ init_jvm_maven_java() {
 </project>
 '
 
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Module
+
+## Purpose
+
+Shared JVM library module.
+
+## Commands
+
+```bash
+mvn -pl libs/common test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep reusable, dependency-light code here. Do not depend on runnable app modules.
+'
+
   write_file "$TARGET_DIR/apps/api/pom.xml" '<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -684,6 +1055,24 @@ init_jvm_maven_java() {
     </plugins>
   </build>
 </project>
+'
+
+  write_file "$TARGET_DIR/apps/api/README.md" '# API Module
+
+## Purpose
+
+Runnable JVM app module placeholder.
+
+## Commands
+
+```bash
+mvn -pl apps/api test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code here. Move reusable code into shared modules.
 '
 
   write_file "$TARGET_DIR/libs/common/src/main/java/com/example/common/Formatting.java" 'package com.example.common;
@@ -739,6 +1128,29 @@ init_jvm_maven_kotlin() {
   echo "Initializing JVM Maven Kotlin multi-module scaffold"
 
   mkdir -p "$TARGET_DIR"/{apps/api/src/main/kotlin/com/example/api,apps/api/src/test/kotlin/com/example/api,libs/common/src/main/kotlin/com/example/common}
+
+  write_file "$TARGET_DIR/README.md" '# JVM Maven Kotlin Harness Scaffold
+
+## Layout
+
+- `apps/api`: runnable JVM app module placeholder.
+- `libs/common`: shared JVM library module.
+- `scripts/codex`: harness scripts when installed.
+
+## Commands
+
+```bash
+./mvnw test
+./mvnw package
+./scripts/codex/verify.sh
+```
+
+If no Maven wrapper exists, use `mvn test`.
+
+## Boundaries
+
+Keep app-specific code in `apps/`. Keep reusable code in `libs/`. Shared libraries should not depend on runnable apps.
+'
 
   write_file "$TARGET_DIR/pom.xml" '<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -843,6 +1255,24 @@ init_jvm_maven_kotlin() {
 </project>
 '
 
+  write_file "$TARGET_DIR/libs/common/README.md" '# Common Module
+
+## Purpose
+
+Shared JVM library module.
+
+## Commands
+
+```bash
+mvn -pl libs/common test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep reusable, dependency-light code here. Do not depend on runnable app modules.
+'
+
   write_file "$TARGET_DIR/apps/api/pom.xml" '<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -906,6 +1336,24 @@ init_jvm_maven_kotlin() {
     </plugins>
   </build>
 </project>
+'
+
+  write_file "$TARGET_DIR/apps/api/README.md" '# API Module
+
+## Purpose
+
+Runnable JVM app module placeholder.
+
+## Commands
+
+```bash
+mvn -pl apps/api test
+./scripts/codex/verify.sh
+```
+
+## Boundaries
+
+Keep app-specific code here. Move reusable code into shared modules.
 '
 
   write_file "$TARGET_DIR/libs/common/src/main/kotlin/com/example/common/Formatting.kt" 'package com.example.common

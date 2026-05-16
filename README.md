@@ -17,7 +17,7 @@ The goal is to avoid rewriting long prompts for every task. Common rules, verifi
 ## Recommended Local Path
 
 ```bash
-/Users/yoonyoul.yoo/DEV/projects/personal/ai-global-harness
+~/ai-global-harness
 ```
 
 ## Main Concepts

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_NAMESPACE="$(basename "$SCRIPT_DIR")"
+DOCS_DIR="${HARNESS_DOCS_DIR:-docs/$AGENT_NAMESPACE}"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 FAILED=0
 
-PROFILE_FILE="docs/codex/harness-profile.env"
+PROFILE_FILE="$DOCS_DIR/harness-profile.env"
 HARNESS_PROFILE="auto"
 
 if [ -f "$PROFILE_FILE" ]; then

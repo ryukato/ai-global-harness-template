@@ -27,6 +27,8 @@ Example:
 ```text
 AGENTS.md
 AGENTS.md.harness-new
+CLAUDE.md
+CLAUDE.md.harness-new
 docs/codex/code-review.md
 docs/codex/code-review.md.harness-new
 ```
@@ -75,6 +77,73 @@ Use `--init-scaffold` only for empty or throwaway projects.
 
 Do not use `--init-scaffold` on normal existing repositories unless you intentionally want to add missing profile-specific project files.
 
+## Agent Entrypoints
+
+Default install creates the Codex-compatible root file:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile typescript --agent codex
+```
+
+For Claude Code:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile typescript --agent claude-code
+```
+
+For both:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile typescript --agent both
+```
+
+Safe mode applies to both `AGENTS.md` and `CLAUDE.md`.
+
+## Legacy Existing Projects
+
+For legacy projects, install without `--init-scaffold`, then mark the project as legacy in:
+
+```text
+docs/codex/project-context.md
+```
+
+Use:
+
+```text
+Project Mode: legacy
+```
+
+Then fill in `Legacy Preservation Notes` so agents preserve existing package layout, naming, layering, transaction boundaries, API contracts, persistence behavior, and deployment assumptions.
+
+See:
+
+```text
+docs/codex/legacy-project-guidance.md
+```
+
+## Optional Jira / Confluence Context
+
+If the existing project uses Jira or Confluence, fill in the Atlassian section in:
+
+```text
+docs/codex/project-context.md
+```
+
+At minimum, record:
+
+```text
+Atlassian Cloud site URL:
+Jira project keys:
+Confluence spaces:
+Allowed write actions:
+```
+
+Do not commit OAuth tokens, API tokens, cookies, or local MCP credential files. Atlassian MCP setup is client/user-local and is documented in:
+
+```text
+docs/codex/atlassian-mcp.md
+```
+
 ## Recommended Existing Project Flow
 
 ```bash
@@ -97,7 +166,7 @@ cd /path/to/existing-project
 
 ## Notes
 
-- `AGENTS.md` is never overwritten in safe mode.
+- `AGENTS.md` and `CLAUDE.md` are never overwritten in safe mode.
 - `docs/codex/harness-profile.env` stores the selected profile.
 - `scripts/codex/verify.sh` is designed to work with existing projects by preferring root scripts when present and avoiding duplicate package-level runs.
 

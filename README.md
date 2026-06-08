@@ -1,6 +1,6 @@
 # AI Global Harness
 
-This repository contains reusable AI/Codex harness templates that can be copied into different projects.
+This repository contains reusable AI coding-agent harness templates that can be copied into different projects.
 
 The goal is to avoid rewriting long prompts for every task. Common rules, verification flows, review criteria, and stack-specific guidance should live here and be copied or adapted into each target repository.
 
@@ -24,7 +24,10 @@ The goal is to avoid rewriting long prompts for every task. Common rules, verifi
 
 ```text
 AGENTS.md
-  Reusable common operating rules for coding agents.
+  Reusable common operating rules for Codex and agents that read AGENTS.md.
+
+CLAUDE.md
+  Claude Code entrypoint when installed with --agent claude-code or --agent both.
 
 docs/codex/project-context.md
   Project-specific notes copied into a target project and edited there.
@@ -37,6 +40,20 @@ docs/codex/done-definition.md
 
 docs/codex/general-scaffold-principles.md
   Project-agnostic scaffold, safety, naming, and verification principles.
+
+docs/codex/legacy-project-guidance.md
+  Rules for preserving existing structure and behavior in legacy projects.
+
+docs/codex/atlassian-mcp.md
+  Optional Jira and Confluence integration guidance through Atlassian Rovo MCP.
+
+docs/claude/
+  Claude Code docs namespace when installed with --agent claude-code or --agent both.
+
+.claude/skills/
+  Claude Code project skills for repeatable workflows such as code review,
+  legacy maintenance, Atlassian context, Graphify, dependency fallback,
+  language-server setup, and change summaries.
 
 docs/codex/monorepo-layout.md
 docs/codex/backend-architecture-boundaries.md
@@ -61,6 +78,12 @@ From this repository:
 
 ```bash
 ./scripts/harness/install-to-project.sh /path/to/target-project --profile typescript
+```
+
+Install both Codex and Claude Code entrypoints:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/target-project --profile typescript --agent both
 ```
 
 For Python with Poetry:
@@ -120,6 +143,19 @@ Apply with backups:
 
 Use `--init-scaffold` only for empty or throwaway projects.
 
+For Claude Code on an existing project:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile mixed --agent claude-code --dry-run
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile mixed --agent claude-code
+```
+
+For both Codex and Claude Code:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/existing-project --profile mixed --agent both
+```
+
 
 ## After Installing Into a Project
 
@@ -131,10 +167,19 @@ cd /path/to/target-project
 ./scripts/codex/verify.sh
 ```
 
+For Claude Code-only installs, use the Claude namespace:
+
+```bash
+cd /path/to/target-project
+./scripts/claude/bootstrap.sh --check
+./scripts/claude/verify.sh
+```
+
 Then edit:
 
 ```text
-docs/codex/project-context.md
+docs/codex/project-context.md      # --agent codex or both
+docs/claude/project-context.md     # --agent claude-code
 ```
 
 to describe the target project.
@@ -143,6 +188,8 @@ For scaffold and architecture guidance, also review:
 
 ```text
 docs/codex/general-scaffold-principles.md
+docs/codex/legacy-project-guidance.md
+docs/codex/atlassian-mcp.md
 docs/codex/monorepo-layout.md
 docs/codex/backend-architecture-boundaries.md
 docs/codex/frontend-structure.md
@@ -232,6 +279,9 @@ cd /path/to/target-project
 # Codex integration
 ./scripts/codex/bootstrap.sh --apply --graphify --graphify-platform codex
 
+# Claude Code integration
+./scripts/claude/bootstrap.sh --apply --graphify --graphify-platform default
+
 # OpenCode integration
 ./scripts/codex/bootstrap.sh --apply --graphify --graphify-platform opencode
 
@@ -240,6 +290,8 @@ cd /path/to/target-project
 ```
 
 Graphify's PyPI package is `graphifyy`, while the installed CLI command is `graphify`.
+
+For Claude Code, use Graphify's default install behavior unless your local Graphify CLI documents a Claude-specific platform value. Do not assume `claude-code` is a valid Graphify platform name.
 
 
 
@@ -279,11 +331,101 @@ The harness templates capture reusable setup rules without assuming a product do
 - Read `AGENTS.md`, `docs/codex/project-context.md`, and listed project references before inferring architecture.
 - Preserve existing files; safe installs write conflicts as `*.harness-new`.
 - Keep scaffolds minimal but explicit, with README files for runnable apps and shared packages.
-- Use `apps/`, `packages/` or `libs/`, `scripts/codex/`, and `docs/codex/` when those directories fit the project.
+- Use `apps/`, `packages/` or `libs/`, and the installed agent namespace such as `scripts/codex/` + `docs/codex/` or `scripts/claude/` + `docs/claude/`.
 - Use explicit `Request` and `Response` contract names. Do not use `DTO` naming in generated scaffolds.
 - Treat proxy/BFF-lite, Ports & Adapters, Graphify, and fullstack layouts as optional patterns selected by project context or profile.
 
 An optional fullstack proxy profile is intentionally deferred for now. The reusable rules are documented in the template docs, but the current supported profiles remain language- or build-tool-oriented so existing behavior stays predictable.
+
+## Claude Code Support
+
+The installer can create a root `CLAUDE.md` entrypoint for Claude Code.
+
+```bash
+# Codex only, default
+./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent codex
+
+# Claude Code only
+./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent claude-code
+
+# Both entrypoints
+./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent both
+```
+
+`AGENTS.md` and `CLAUDE.md` are generated from separate base templates but share the same profile append rules. Existing files are still protected by safe mode and conflicts are written as `*.harness-new`.
+
+Installed harness docs and scripts use an agent namespace:
+
+```text
+--agent codex       -> docs/codex,  scripts/codex,  .codex-runs
+--agent claude-code -> docs/claude, scripts/claude, .claude-runs, .claude/skills
+--agent both        -> installs both namespaces and Claude project skills
+```
+
+For Claude Code, general project context remains under `docs/claude/`, while repeatable workflow instructions are installed as project skills:
+
+```text
+.claude/skills/code-review/SKILL.md
+.claude/skills/legacy-maintenance/SKILL.md
+.claude/skills/atlassian-context/SKILL.md
+.claude/skills/graphify/SKILL.md
+.claude/skills/dependency-fallback/SKILL.md
+.claude/skills/language-server-setup/SKILL.md
+.claude/skills/summarize-changes/SKILL.md
+```
+
+Claude Code project skills follow Anthropic's documented layout: `.claude/skills/<skill-name>/SKILL.md`. The skill frontmatter `description` tells Claude when to load the skill. See `docs/claude/claude-skills.md` after installation.
+
+## Legacy Project Mode
+
+For established systems, install the harness without `--init-scaffold`, then mark the project as legacy in:
+
+```text
+docs/codex/project-context.md
+docs/claude/project-context.md
+```
+
+Set:
+
+```text
+Project Mode: legacy
+Legacy system name: SingleOne or another legacy system name
+```
+
+Legacy mode tells agents to preserve existing package/module layout, naming, transaction boundaries, API behavior, data shapes, persistence assumptions, and deployment conventions. See:
+
+```text
+docs/codex/legacy-project-guidance.md
+.claude/skills/legacy-maintenance/SKILL.md
+```
+
+## Atlassian Jira / Confluence MCP
+
+The harness includes optional guidance for connecting agents to Jira and Confluence through Atlassian's official Rovo MCP Server.
+
+The documented current remote endpoint is:
+
+```text
+https://mcp.atlassian.com/v1/mcp/authv2
+```
+
+For local IDE or custom MCP clients that need a stdio proxy, Atlassian documents `mcp-remote`:
+
+```bash
+npx -y mcp-remote@latest https://mcp.atlassian.com/v1/mcp/authv2
+```
+
+Do not commit OAuth tokens, API tokens, cookies, or local MCP credential files. Project-specific Jira project keys, Confluence spaces, and allowed write actions should be recorded in:
+
+```text
+docs/codex/project-context.md or docs/claude/project-context.md
+```
+
+See:
+
+```text
+docs/codex/atlassian-mcp.md or .claude/skills/atlassian-context/SKILL.md
+```
 
 
 
@@ -306,6 +448,7 @@ Target projects contain:
 
 ```text
 docs/codex/harness-profile.env
+docs/claude/harness-profile.env
 ```
 
 Example:
@@ -319,6 +462,8 @@ Both bootstrap and verification are profile-aware:
 ```bash
 ./scripts/codex/bootstrap.sh --check
 ./scripts/codex/verify.sh
+./scripts/claude/bootstrap.sh --check
+./scripts/claude/verify.sh
 ```
 
 For `typescript`, `verify.sh` runs only Node/TypeScript checks. It does not run Python or JVM checks.
@@ -403,6 +548,14 @@ Target projects include profile-aware language server setup:
 ./scripts/codex/language-server.sh --check
 ./scripts/codex/language-server.sh --apply
 ./scripts/codex/language-server.sh --apply --install
+```
+
+For Claude Code-only installs:
+
+```bash
+./scripts/claude/language-server.sh --check
+./scripts/claude/language-server.sh --apply
+./scripts/claude/language-server.sh --apply --install
 ```
 
 Or through bootstrap:

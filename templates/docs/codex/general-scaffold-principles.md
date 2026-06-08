@@ -17,6 +17,22 @@ These principles are reusable across projects. Keep product domains, business ru
 - Use safe install behavior, backup mode, or `*.harness-new` conflict files instead of silent overwrites.
 - Do not change package managers, build tools, or framework choices unless explicitly requested.
 
+## Legacy Projects
+
+When `docs/codex/project-context.md` marks the project as `legacy`:
+
+- Preserve the existing module/package/directory structure.
+- Follow nearby conventions before applying generic harness or scaffold patterns.
+- Prefer localized changes over architecture rewrites.
+- Do not introduce new layers, packages, proxy apps, shared-contract packages, or infrastructure unless explicitly requested.
+- Treat compatibility with existing APIs, data shapes, persistence behavior, and deployment assumptions as part of the task.
+
+See:
+
+```text
+docs/codex/legacy-project-guidance.md
+```
+
 ## Minimal But Explicit
 
 - Scaffolds should be small enough to understand and complete enough to verify.

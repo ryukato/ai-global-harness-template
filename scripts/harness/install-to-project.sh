@@ -10,6 +10,7 @@ FORCE_INIT=false
 DRY_RUN=false
 INSTALL_MODE="safe"
 BACKUP_DIR=""
+AGENT_TARGETS="codex"
 
 print_usage() {
   cat <<'USAGE'
@@ -41,6 +42,11 @@ Options:
                         backup     Backup existing files to .ai-harness-backups/<timestamp>/, then overwrite.
                         overwrite  Overwrite existing files directly.
 
+  --agent <agent>       Agent entrypoint to install.
+                        codex       Default. Install AGENTS.md.
+                        claude-code Install CLAUDE.md.
+                        both        Install both AGENTS.md and CLAUDE.md.
+
   --dry-run             Print what would happen without writing files.
 
   -h, --help            Show this help.
@@ -54,6 +60,9 @@ Examples:
 
   # Empty TypeScript test project: create scaffold + harness
   ./scripts/harness/install-to-project.sh /tmp/dummy-ts --profile typescript --init-scaffold
+
+  # Install both Codex and Claude Code entrypoints
+  ./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent both
 
   # Preview
   ./scripts/harness/install-to-project.sh /path/to/project --profile typescript --dry-run
@@ -173,59 +182,228 @@ copy_template() {
   write_file_from_source "$HARNESS_ROOT/$rel" "$TARGET_DIR/$dst_rel"
 }
 
-append_profile_rules_to_agents() {
-  local profile_file="$PROFILE_DIR/AGENTS.append.md"
-  local target_agents="$TARGET_DIR/AGENTS.md"
+agent_namespace() {
+  case "$1" in
+    codex)
+      echo "codex"
+      ;;
+    claude-code)
+      echo "claude"
+      ;;
+    *)
+      fail "Unknown agent target: $1"
+      ;;
+  esac
+}
 
-  [ -f "$profile_file" ] || return 0
+render_for_namespace() {
+  local src="$1"
+  local dst="$2"
+  local namespace="$3"
+
+  if [ "$namespace" = "claude" ]; then
+    sed \
+      -e "s#docs/codex#docs/$namespace#g" \
+      -e "s#scripts/codex#scripts/$namespace#g" \
+      -e "s#\\.codex-runs#.$namespace-runs#g" \
+      -e "s#docs/$namespace/code-review.md#.claude/skills/code-review/SKILL.md#g" \
+      -e "s#docs/$namespace/legacy-project-guidance.md#.claude/skills/legacy-maintenance/SKILL.md#g" \
+      -e "s#docs/$namespace/atlassian-mcp.md#.claude/skills/atlassian-context/SKILL.md#g" \
+      -e "s#docs/$namespace/graphify.md#.claude/skills/graphify/SKILL.md#g" \
+      -e "s#docs/$namespace/dependency-fallback.md#.claude/skills/dependency-fallback/SKILL.md#g" \
+      -e "s#docs/$namespace/language-server.md#.claude/skills/language-server-setup/SKILL.md#g" \
+      "$src" > "$dst"
+  else
+    sed \
+      -e "s#docs/codex#docs/$namespace#g" \
+      -e "s#scripts/codex#scripts/$namespace#g" \
+      -e "s#\\.codex-runs#.$namespace-runs#g" \
+      "$src" > "$dst"
+  fi
+}
+
+write_rendered_file_from_source() {
+  local src="$1"
+  local dst="$2"
+  local namespace="$3"
+  local tmp
+  tmp="$(mktemp)"
+  render_for_namespace "$src" "$tmp" "$namespace"
+  write_file_from_source "$tmp" "$dst"
+  rm -f "$tmp"
+}
+
+copy_template_for_namespace() {
+  local rel="$1"
+  local dst_rel="$2"
+  local namespace="$3"
+
+  write_rendered_file_from_source "$HARNESS_ROOT/$rel" "$TARGET_DIR/$dst_rel" "$namespace"
+}
+
+install_claude_project_skills() {
+  copy_template_for_namespace "templates/skills/claude/code-review/SKILL.md" ".claude/skills/code-review/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/legacy-maintenance/SKILL.md" ".claude/skills/legacy-maintenance/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/atlassian-context/SKILL.md" ".claude/skills/atlassian-context/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/graphify/SKILL.md" ".claude/skills/graphify/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/dependency-fallback/SKILL.md" ".claude/skills/dependency-fallback/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/language-server-setup/SKILL.md" ".claude/skills/language-server-setup/SKILL.md" "claude"
+  copy_template_for_namespace "templates/skills/claude/summarize-changes/SKILL.md" ".claude/skills/summarize-changes/SKILL.md" "claude"
+}
+
+agent_target_enabled() {
+  local wanted="$1"
+
+  case "$AGENT_TARGETS" in
+    both)
+      return 0
+      ;;
+    "$wanted")
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+install_agent_entrypoint() {
+  local target_rel="$1"
+  local base_rel="$2"
+  local display_name="$3"
+  local namespace="$4"
+  local profile_file="$PROFILE_DIR/AGENTS.append.md"
+  local target_file="$TARGET_DIR/$target_rel"
+  local marker="Profile-specific rules appended by ai-global-harness: $PROFILE"
+
+  [ -f "$HARNESS_ROOT/$base_rel" ] || fail "Agent template not found: $base_rel"
 
   local tmp
   tmp="$(mktemp)"
 
-  if [ -f "$target_agents" ]; then
-    cat "$target_agents" > "$tmp"
-    {
-      echo
-      echo "<!-- Profile-specific rules appended by ai-global-harness: $PROFILE -->"
-      echo
-      cat "$profile_file"
-    } >> "$tmp"
+  if [ -f "$target_file" ]; then
+    if grep -q "$marker" "$target_file"; then
+      log "$display_name already contains profile rules for $PROFILE"
+      rm -f "$tmp"
+      return 0
+    fi
 
     if [ "$DRY_RUN" = true ]; then
       case "$INSTALL_MODE" in
         safe)
-          log "DRY-RUN conflict: would write merged AGENTS.md to ${target_agents}.harness-new"
+          log "DRY-RUN conflict: existing $display_name kept; incoming file would be ${target_file}.harness-new"
           ;;
         backup)
-          log "DRY-RUN conflict: would backup then overwrite merged AGENTS.md"
+          log "DRY-RUN conflict: would backup then overwrite merged $display_name"
           ;;
         overwrite)
-          log "DRY-RUN conflict: would overwrite AGENTS.md with merged profile rules"
+          log "DRY-RUN conflict: would overwrite $display_name with merged profile rules"
           ;;
       esac
       rm -f "$tmp"
       return 0
     fi
 
-    if grep -q "Profile-specific rules appended by ai-global-harness: $PROFILE" "$target_agents"; then
-      log "Profile rules already present in AGENTS.md"
-      rm -f "$tmp"
-      return 0
-    fi
-
-    write_file_from_source "$tmp" "$target_agents"
+    case "$INSTALL_MODE" in
+      safe)
+        cat "$HARNESS_ROOT/$base_rel" > "$tmp"
+        if [ -f "$profile_file" ]; then
+          {
+            echo
+            echo "<!-- $marker -->"
+            echo
+            cat "$profile_file"
+          } >> "$tmp"
+        fi
+        write_rendered_file_from_source "$tmp" "$target_file" "$namespace"
+        ;;
+      backup|overwrite)
+        cat "$target_file" > "$tmp"
+        if [ -f "$profile_file" ]; then
+          {
+            echo
+            echo "<!-- $marker -->"
+            echo
+            cat "$profile_file"
+          } >> "$tmp"
+        fi
+        write_rendered_file_from_source "$tmp" "$target_file" "$namespace"
+        ;;
+    esac
   else
-    cat "$HARNESS_ROOT/templates/AGENTS.base.md" > "$tmp"
-    {
-      echo
-      echo "<!-- Profile-specific rules appended by ai-global-harness: $PROFILE -->"
-      echo
-      cat "$profile_file"
-    } >> "$tmp"
-    write_file_from_source "$tmp" "$target_agents"
+    cat "$HARNESS_ROOT/$base_rel" > "$tmp"
+    if [ -f "$profile_file" ]; then
+      {
+        echo
+        echo "<!-- $marker -->"
+        echo
+        cat "$profile_file"
+      } >> "$tmp"
+    fi
+    write_rendered_file_from_source "$tmp" "$target_file" "$namespace"
   fi
 
   rm -f "$tmp"
+}
+
+install_harness_namespace() {
+  local namespace="$1"
+  local docs_dir="docs/$namespace"
+  local scripts_dir="scripts/$namespace"
+  local runs_dir=".$namespace-runs"
+
+  copy_template_for_namespace "templates/docs/codex/project-context.md" "$docs_dir/project-context.md" "$namespace"
+  if [ "$namespace" != "claude" ]; then
+    copy_template_for_namespace "templates/docs/codex/code-review.md" "$docs_dir/code-review.md" "$namespace"
+  fi
+  copy_template_for_namespace "templates/docs/codex/done-definition.md" "$docs_dir/done-definition.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/task-template.short.md" "$docs_dir/task-template.short.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/task-template.medium.md" "$docs_dir/task-template.medium.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/run-log-format.md" "$docs_dir/run-log-format.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/general-scaffold-principles.md" "$docs_dir/general-scaffold-principles.md" "$namespace"
+  if [ "$namespace" != "claude" ]; then
+    copy_template_for_namespace "templates/docs/codex/legacy-project-guidance.md" "$docs_dir/legacy-project-guidance.md" "$namespace"
+    copy_template_for_namespace "templates/docs/codex/atlassian-mcp.md" "$docs_dir/atlassian-mcp.md" "$namespace"
+  fi
+  copy_template_for_namespace "templates/docs/codex/monorepo-layout.md" "$docs_dir/monorepo-layout.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/backend-architecture-boundaries.md" "$docs_dir/backend-architecture-boundaries.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/frontend-structure.md" "$docs_dir/frontend-structure.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/proxy-bff-pattern.md" "$docs_dir/proxy-bff-pattern.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/shared-contracts.md" "$docs_dir/shared-contracts.md" "$namespace"
+  if [ "$namespace" != "claude" ]; then
+    copy_template_for_namespace "templates/docs/codex/graphify.md" "$docs_dir/graphify.md" "$namespace"
+  fi
+  copy_template_for_namespace "templates/docs/codex/harness-profile.md" "$docs_dir/harness-profile.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/existing-project-install.md" "$docs_dir/existing-project-install.md" "$namespace"
+  copy_template_for_namespace "templates/docs/codex/typescript-scaffold-troubleshooting.md" "$docs_dir/typescript-scaffold-troubleshooting.md" "$namespace"
+  if [ "$namespace" != "claude" ]; then
+    copy_template_for_namespace "templates/docs/codex/dependency-fallback.md" "$docs_dir/dependency-fallback.md" "$namespace"
+  fi
+  copy_template_for_namespace "templates/docs/codex/jvm-profiles.md" "$docs_dir/jvm-profiles.md" "$namespace"
+  if [ "$namespace" != "claude" ]; then
+    copy_template_for_namespace "templates/docs/codex/language-server.md" "$docs_dir/language-server.md" "$namespace"
+  else
+    copy_template_for_namespace "templates/docs/codex/claude-skills.md" "$docs_dir/claude-skills.md" "$namespace"
+    install_claude_project_skills
+  fi
+
+  write_generated_file "$TARGET_DIR/$docs_dir/harness-profile.env" "HARNESS_PROFILE=$PROFILE
+"
+
+  copy_template_for_namespace "templates/scripts/codex/bootstrap.sh" "$scripts_dir/bootstrap.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/verify.sh" "$scripts_dir/verify.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/changed-files.sh" "$scripts_dir/changed-files.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/summarize-diff.sh" "$scripts_dir/summarize-diff.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/start-run.sh" "$scripts_dir/start-run.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/collect-run-summary.sh" "$scripts_dir/collect-run-summary.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/weekly-report.sh" "$scripts_dir/weekly-report.sh" "$namespace"
+  copy_template_for_namespace "templates/scripts/codex/language-server.sh" "$scripts_dir/language-server.sh" "$namespace"
+
+  if [ "$DRY_RUN" != true ]; then
+    chmod +x "$TARGET_DIR"/"$scripts_dir"/*.sh 2>/dev/null || true
+    mkdir -p "$TARGET_DIR/$runs_dir"
+    touch "$TARGET_DIR/$runs_dir/.gitkeep"
+  fi
 }
 
 if [ "$#" -lt 1 ]; then
@@ -252,6 +430,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --mode)
       INSTALL_MODE="${2:-}"
+      shift 2
+      ;;
+    --agent|--agents)
+      AGENT_TARGETS="${2:-}"
       shift 2
       ;;
     --dry-run)
@@ -288,6 +470,14 @@ case "$INSTALL_MODE" in
     ;;
 esac
 
+case "$AGENT_TARGETS" in
+  codex|claude-code|both)
+    ;;
+  *)
+    fail "Invalid --agent: $AGENT_TARGETS. Use codex, claude-code, or both."
+    ;;
+esac
+
 mkdir -p "$TARGET_DIR"
 
 PROFILE_DIR="$HARNESS_ROOT/profiles/$PROFILE"
@@ -309,84 +499,20 @@ log "Installing AI harness"
 log "Target: $TARGET_DIR"
 log "Profile: $PROFILE"
 log "Mode: $INSTALL_MODE"
+log "Agent entrypoints: $AGENT_TARGETS"
 if [ "$DRY_RUN" = true ]; then
   log "Dry run: true"
 fi
 
-# AGENTS.md requires special handling so profile rules can be included.
-if [ -f "$TARGET_DIR/AGENTS.md" ]; then
-  if grep -q "Profile-specific rules appended by ai-global-harness: $PROFILE" "$TARGET_DIR/AGENTS.md"; then
-    log "AGENTS.md already contains profile rules for $PROFILE"
-  else
-    case "$INSTALL_MODE" in
-      safe)
-        # Do not mutate existing AGENTS.md in safe mode.
-        tmp_agents="$(mktemp)"
-        cat "$HARNESS_ROOT/templates/AGENTS.base.md" > "$tmp_agents"
-        if [ -f "$PROFILE_DIR/AGENTS.append.md" ]; then
-          {
-            echo
-            echo "<!-- Profile-specific rules appended by ai-global-harness: $PROFILE -->"
-            echo
-            cat "$PROFILE_DIR/AGENTS.append.md"
-          } >> "$tmp_agents"
-        fi
-
-        if [ "$DRY_RUN" = true ]; then
-          log "DRY-RUN conflict: existing AGENTS.md kept; incoming file would be AGENTS.md.harness-new"
-        else
-          cp "$tmp_agents" "$TARGET_DIR/AGENTS.md.harness-new"
-          warn "Existing AGENTS.md kept."
-          warn "Incoming AGENTS.md written to: $TARGET_DIR/AGENTS.md.harness-new"
-        fi
-        rm -f "$tmp_agents"
-        ;;
-      backup|overwrite)
-        append_profile_rules_to_agents
-        ;;
-    esac
-  fi
-else
-  append_profile_rules_to_agents
+# Agent entrypoint files require special handling so profile rules can be included.
+if agent_target_enabled codex; then
+  install_agent_entrypoint "AGENTS.md" "templates/AGENTS.base.md" "AGENTS.md" "codex"
+  install_harness_namespace "codex"
 fi
 
-copy_template "templates/docs/codex/project-context.md" "docs/codex/project-context.md"
-copy_template "templates/docs/codex/code-review.md" "docs/codex/code-review.md"
-copy_template "templates/docs/codex/done-definition.md" "docs/codex/done-definition.md"
-copy_template "templates/docs/codex/task-template.short.md" "docs/codex/task-template.short.md"
-copy_template "templates/docs/codex/task-template.medium.md" "docs/codex/task-template.medium.md"
-copy_template "templates/docs/codex/run-log-format.md" "docs/codex/run-log-format.md"
-copy_template "templates/docs/codex/general-scaffold-principles.md" "docs/codex/general-scaffold-principles.md"
-copy_template "templates/docs/codex/monorepo-layout.md" "docs/codex/monorepo-layout.md"
-copy_template "templates/docs/codex/backend-architecture-boundaries.md" "docs/codex/backend-architecture-boundaries.md"
-copy_template "templates/docs/codex/frontend-structure.md" "docs/codex/frontend-structure.md"
-copy_template "templates/docs/codex/proxy-bff-pattern.md" "docs/codex/proxy-bff-pattern.md"
-copy_template "templates/docs/codex/shared-contracts.md" "docs/codex/shared-contracts.md"
-copy_template "templates/docs/codex/graphify.md" "docs/codex/graphify.md"
-copy_template "templates/docs/codex/harness-profile.md" "docs/codex/harness-profile.md"
-copy_template "templates/docs/codex/existing-project-install.md" "docs/codex/existing-project-install.md"
-copy_template "templates/docs/codex/typescript-scaffold-troubleshooting.md" "docs/codex/typescript-scaffold-troubleshooting.md"
-copy_template "templates/docs/codex/dependency-fallback.md" "docs/codex/dependency-fallback.md"
-copy_template "templates/docs/codex/jvm-profiles.md" "docs/codex/jvm-profiles.md"
-copy_template "templates/docs/codex/language-server.md" "docs/codex/language-server.md"
-
-# harness-profile.env is intentionally generated for the selected profile.
-write_generated_file "$TARGET_DIR/docs/codex/harness-profile.env" "HARNESS_PROFILE=$PROFILE
-"
-
-copy_template "templates/scripts/codex/bootstrap.sh" "scripts/codex/bootstrap.sh"
-copy_template "templates/scripts/codex/verify.sh" "scripts/codex/verify.sh"
-copy_template "templates/scripts/codex/changed-files.sh" "scripts/codex/changed-files.sh"
-copy_template "templates/scripts/codex/summarize-diff.sh" "scripts/codex/summarize-diff.sh"
-copy_template "templates/scripts/codex/start-run.sh" "scripts/codex/start-run.sh"
-copy_template "templates/scripts/codex/collect-run-summary.sh" "scripts/codex/collect-run-summary.sh"
-copy_template "templates/scripts/codex/weekly-report.sh" "scripts/codex/weekly-report.sh"
-copy_template "templates/scripts/codex/language-server.sh" "scripts/codex/language-server.sh"
-
-if [ "$DRY_RUN" != true ]; then
-  chmod +x "$TARGET_DIR"/scripts/codex/*.sh 2>/dev/null || true
-  mkdir -p "$TARGET_DIR/.codex-runs"
-  touch "$TARGET_DIR/.codex-runs/.gitkeep"
+if agent_target_enabled claude-code; then
+  install_agent_entrypoint "CLAUDE.md" "templates/CLAUDE.base.md" "CLAUDE.md" "claude"
+  install_harness_namespace "claude"
 fi
 
 log ""
@@ -425,5 +551,12 @@ case "$PROFILE" in
     ;;
 esac
 
-log "  ./scripts/codex/bootstrap.sh --check"
-log "  ./scripts/codex/verify.sh"
+if agent_target_enabled codex; then
+  log "  ./scripts/codex/bootstrap.sh --check"
+  log "  ./scripts/codex/verify.sh"
+fi
+
+if agent_target_enabled claude-code; then
+  log "  ./scripts/claude/bootstrap.sh --check"
+  log "  ./scripts/claude/verify.sh"
+fi

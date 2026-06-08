@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_NAMESPACE="$(basename "$SCRIPT_DIR")"
+DOCS_DIR="${HARNESS_DOCS_DIR:-docs/$AGENT_NAMESPACE}"
+SCRIPTS_DIR="${HARNESS_SCRIPTS_DIR:-scripts/$AGENT_NAMESPACE}"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
-PROFILE_FILE="docs/codex/harness-profile.env"
+PROFILE_FILE="$DOCS_DIR/harness-profile.env"
 HARNESS_PROFILE="auto"
 
 if [ -f "$PROFILE_FILE" ]; then
@@ -18,12 +22,12 @@ APPLY=false
 INSTALL=false
 
 print_usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 Usage:
-  ./scripts/codex/language-server.sh --check
-  ./scripts/codex/language-server.sh --apply
-  ./scripts/codex/language-server.sh --install
-  ./scripts/codex/language-server.sh --apply --install
+  ./$SCRIPTS_DIR/language-server.sh --check
+  ./$SCRIPTS_DIR/language-server.sh --apply
+  ./$SCRIPTS_DIR/language-server.sh --install
+  ./$SCRIPTS_DIR/language-server.sh --apply --install
 
 Options:
   --check    Check language server / linter / formatter availability.
@@ -32,7 +36,7 @@ Options:
   -h, --help Show this help.
 
 Environment:
-  HARNESS_PROFILE is read from docs/codex/harness-profile.env.
+  HARNESS_PROFILE is read from $PROFILE_FILE.
 
 Notes:
   Existing files are not overwritten. Incoming files are written as *.harness-new.

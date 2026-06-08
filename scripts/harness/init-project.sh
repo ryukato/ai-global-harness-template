@@ -7,11 +7,12 @@ TARGET_DIR=""
 PROFILE=""
 FORCE=false
 INSTALL_HARNESS=false
+AGENT_TARGETS="codex"
 
 print_usage() {
   cat <<'USAGE'
 Usage:
-  ./scripts/harness/init-project.sh /path/to/target-project --profile <profile> [--install-harness] [--force]
+  ./scripts/harness/init-project.sh /path/to/target-project --profile <profile> [--install-harness] [--agent <agent>] [--force]
 
 Profiles:
   typescript
@@ -24,7 +25,10 @@ Profiles:
 
 
 Options:
-  --install-harness  Also install AGENTS.md, docs/codex, and scripts/codex.
+  --install-harness  Also install agent entrypoint files, namespaced docs/scripts,
+                     and Claude project skills when --agent claude-code or both is used.
+  --agent <agent>    Agent entrypoint to install when --install-harness is used.
+                     codex, claude-code, or both. Default: codex.
   --force            Overwrite scaffold files if they already exist.
   -h, --help         Show this help.
 
@@ -1408,6 +1412,10 @@ while [ "$#" -gt 0 ]; do
       INSTALL_HARNESS=true
       shift
       ;;
+    --agent|--agents)
+      AGENT_TARGETS="${2:-}"
+      shift 2
+      ;;
     --force)
       FORCE=true
       shift
@@ -1429,6 +1437,15 @@ if [ -z "$PROFILE" ]; then
   print_usage
   exit 1
 fi
+
+case "$AGENT_TARGETS" in
+  codex|claude-code|both)
+    ;;
+  *)
+    echo "Invalid --agent: $AGENT_TARGETS. Use codex, claude-code, or both." >&2
+    exit 1
+    ;;
+esac
 
 mkdir -p "$TARGET_DIR"
 
@@ -1462,7 +1479,7 @@ case "$PROFILE" in
 esac
 
 if [ "$INSTALL_HARNESS" = true ]; then
-  "$HARNESS_ROOT/scripts/harness/install-to-project.sh" "$TARGET_DIR" --profile "$PROFILE"
+  "$HARNESS_ROOT/scripts/harness/install-to-project.sh" "$TARGET_DIR" --profile "$PROFILE" --agent "$AGENT_TARGETS"
 fi
 
 echo
@@ -1490,6 +1507,20 @@ case "$PROFILE" in
 esac
 
 if [ "$INSTALL_HARNESS" = true ]; then
-  echo "  ./scripts/codex/bootstrap.sh --check"
-  echo "  ./scripts/codex/verify.sh"
+  case "$AGENT_TARGETS" in
+    codex)
+      echo "  ./scripts/codex/bootstrap.sh --check"
+      echo "  ./scripts/codex/verify.sh"
+      ;;
+    claude-code)
+      echo "  ./scripts/claude/bootstrap.sh --check"
+      echo "  ./scripts/claude/verify.sh"
+      ;;
+    both)
+      echo "  ./scripts/codex/bootstrap.sh --check"
+      echo "  ./scripts/codex/verify.sh"
+      echo "  ./scripts/claude/bootstrap.sh --check"
+      echo "  ./scripts/claude/verify.sh"
+      ;;
+  esac
 fi

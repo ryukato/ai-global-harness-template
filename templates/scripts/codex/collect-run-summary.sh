@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_NAMESPACE="$(basename "$SCRIPT_DIR")"
+RUNS_DIR="${HARNESS_RUNS_DIR:-.$AGENT_NAMESPACE-runs}"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 RUN_DIR="${1:-}"
 
 if [ -z "$RUN_DIR" ]; then
-  RUN_DIR="$(find .codex-runs -maxdepth 1 -type d | sort | tail -n 1)"
+  RUN_DIR="$(find "$RUNS_DIR" -maxdepth 1 -type d | sort | tail -n 1)"
 fi
 
 if [ ! -d "$RUN_DIR" ]; then

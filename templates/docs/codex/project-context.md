@@ -8,6 +8,23 @@ TODO: Fill in the project name.
 
 TODO: Describe what this project does.
 
+## Project Mode
+
+TODO: Select one.
+
+```text
+new | existing | legacy
+```
+
+Use `legacy` for established systems where agents should preserve existing structure and behavior rather than applying new scaffold patterns.
+
+If legacy:
+
+```text
+Legacy system name: TODO
+Legacy compatibility notes: TODO
+```
+
 ## Stack
 
 TODO: Select and describe the stack and harness profile.
@@ -59,6 +76,8 @@ Examples:
 - Config/env access:
 - Shared utilities:
 
+For legacy projects, describe the existing boundaries instead of inventing new ones. Agents must preserve the documented boundaries unless a task explicitly asks for migration.
+
 ## Dependency Direction
 
 TODO: Describe allowed dependency direction.
@@ -87,6 +106,27 @@ TODO
 ## Domain Notes
 
 TODO: Add domain rules that agents must not infer incorrectly.
+
+## Legacy Preservation Notes
+
+TODO: Fill this section when Project Mode is `legacy`.
+
+Examples:
+
+- Existing package roots that must be preserved:
+- Controller/service/repository naming conventions:
+- Transaction boundaries:
+- Error-handling conventions:
+- External API compatibility requirements:
+- Database/schema compatibility requirements:
+- Deployment/runtime assumptions:
+- Paths agents must avoid unless explicitly requested:
+
+See:
+
+```text
+docs/codex/legacy-project-guidance.md
+```
 
 ## API / Contract Notes
 
@@ -131,6 +171,32 @@ If enabled:
 - Do not commit large cache output unless intentionally tracked.
 
 If Graphify cannot run, report the command attempted, error summary, likely cause, and recommended follow-up.
+
+## Optional Atlassian MCP Usage
+
+TODO: State whether Atlassian Jira and Confluence are used as external project context.
+
+If enabled:
+
+```text
+Atlassian Cloud site URL: TODO
+Jira project keys: TODO
+Confluence spaces: TODO
+Primary product/spec pages: TODO
+Issue workflow constraints: TODO
+Allowed write actions: read-only by default unless explicitly requested
+Required confirmation before writes: yes
+```
+
+Use Atlassian MCP for Jira/Confluence context when available, especially when a task references tickets, wiki pages, specs, runbooks, or acceptance criteria.
+
+If Atlassian MCP is unavailable, agents should report that clearly and ask for the relevant ticket/page content or URL.
+
+See:
+
+```text
+docs/codex/atlassian-mcp.md
+```
 
 ## Language Server Tooling
 

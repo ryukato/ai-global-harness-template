@@ -1,17 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_NAMESPACE="$(basename "$SCRIPT_DIR")"
+DOCS_DIR="${HARNESS_DOCS_DIR:-docs/$AGENT_NAMESPACE}"
+SCRIPTS_DIR="${HARNESS_SCRIPTS_DIR:-scripts/$AGENT_NAMESPACE}"
+RUNS_DIR="${HARNESS_RUNS_DIR:-.$AGENT_NAMESPACE-runs}"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 APPLY=false
 WITH_GRAPHIFY=false
 REBUILD_GRAPH=false
-GRAPHIFY_PLATFORM="codex"
+DEFAULT_GRAPHIFY_PLATFORM="codex"
+if [ "$AGENT_NAMESPACE" = "claude" ]; then
+  DEFAULT_GRAPHIFY_PLATFORM="default"
+fi
+GRAPHIFY_PLATFORM="$DEFAULT_GRAPHIFY_PLATFORM"
 WITH_LANGUAGE_SERVER=false
 INSTALL_LANGUAGE_SERVER=false
 
-PROFILE_FILE="docs/codex/harness-profile.env"
+PROFILE_FILE="$DOCS_DIR/harness-profile.env"
 HARNESS_PROFILE="auto"
 
 if [ -f "$PROFILE_FILE" ]; then
@@ -22,21 +31,21 @@ fi
 HARNESS_PROFILE="${HARNESS_PROFILE:-auto}"
 
 print_usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 Usage:
-  ./scripts/codex/bootstrap.sh --check
-  ./scripts/codex/bootstrap.sh --apply
-  ./scripts/codex/bootstrap.sh --apply --graphify
-  ./scripts/codex/bootstrap.sh --apply --graphify --graphify-platform codex
-  ./scripts/codex/bootstrap.sh --apply --graphify --rebuild-graph
-  ./scripts/codex/bootstrap.sh --apply --language-server
-  ./scripts/codex/bootstrap.sh --apply --language-server --install-language-server
+  ./$SCRIPTS_DIR/bootstrap.sh --check
+  ./$SCRIPTS_DIR/bootstrap.sh --apply
+  ./$SCRIPTS_DIR/bootstrap.sh --apply --graphify
+  ./$SCRIPTS_DIR/bootstrap.sh --apply --graphify --graphify-platform $DEFAULT_GRAPHIFY_PLATFORM
+  ./$SCRIPTS_DIR/bootstrap.sh --apply --graphify --rebuild-graph
+  ./$SCRIPTS_DIR/bootstrap.sh --apply --language-server
+  ./$SCRIPTS_DIR/bootstrap.sh --apply --language-server --install-language-server
 
 Options:
   --check                     Inspect the local environment only.
   --apply                     Apply safe local bootstrap steps.
   --graphify                  Install/apply Graphify integration when possible.
-  --graphify-platform <name>  Target Graphify platform. Default: codex.
+  --graphify-platform <name>  Target Graphify platform. Default: $DEFAULT_GRAPHIFY_PLATFORM.
                               Examples: codex, opencode, aider, copilot, claw, droid, trae.
                               Use "default" for Graphify's default platform install.
   --rebuild-graph             Attempt graph rebuild when the local Graphify CLI supports it.
@@ -218,9 +227,9 @@ check_profile_environment() {
 apply_basic_setup() {
   echo
   echo "Applying basic harness setup"
-  mkdir -p docs/codex scripts/codex .codex-runs
-  chmod +x scripts/codex/*.sh 2>/dev/null || true
-  echo "OK: ensured docs/codex, scripts/codex, and .codex-runs"
+  mkdir -p "$DOCS_DIR" "$SCRIPTS_DIR" "$RUNS_DIR"
+  chmod +x "$SCRIPTS_DIR"/*.sh 2>/dev/null || true
+  echo "OK: ensured $DOCS_DIR, $SCRIPTS_DIR, and $RUNS_DIR"
 }
 
 run_graphify() {
@@ -390,13 +399,17 @@ report_graphify_status() {
     echo "OK: graph visualization found: graphify-out/graph.html"
   fi
 
-  cat <<'NOTE'
+  cat <<NOTE
 
 Graphify notes:
 - The PyPI package name is graphifyy.
 - The CLI command is graphify.
+- For this agent namespace, the default integration command is:
+    graphify install --platform $DEFAULT_GRAPHIFY_PLATFORM
 - For Codex, the intended integration command is usually:
     graphify install --platform codex
+- For Claude Code, use Graphify's default install behavior unless your local Graphify CLI documents a Claude-specific platform:
+    graphify install
 - After platform integration, graph generation may be exposed as an assistant slash command:
     /graphify .
 
@@ -406,7 +419,10 @@ Some Graphify/Codex workflows may require this in ~/.codex/config.toml:
   [features]
   multi_agent = true
 
-Do not commit user-level Codex configuration into this repository unless your team explicitly standardizes it.
+Claude Code user-level config note:
+Graphify may install a skill under ~/.claude/skills/ for Claude Code.
+
+Do not commit user-level agent configuration into this repository unless your team explicitly standardizes it.
 NOTE
 }
 
@@ -485,16 +501,16 @@ if [ "$WITH_LANGUAGE_SERVER" = true ]; then
   echo
   echo "Language server setup requested"
 
-  if [ -x "./scripts/codex/language-server.sh" ]; then
+  if [ -x "./$SCRIPTS_DIR/language-server.sh" ]; then
     if [ "$APPLY" = true ] && [ "$INSTALL_LANGUAGE_SERVER" = true ]; then
-      ./scripts/codex/language-server.sh --apply --install
+      "./$SCRIPTS_DIR/language-server.sh" --apply --install
     elif [ "$APPLY" = true ]; then
-      ./scripts/codex/language-server.sh --apply
+      "./$SCRIPTS_DIR/language-server.sh" --apply
     else
-      ./scripts/codex/language-server.sh --check
+      "./$SCRIPTS_DIR/language-server.sh" --check
     fi
   else
-    warn "scripts/codex/language-server.sh not found or not executable."
+    warn "$SCRIPTS_DIR/language-server.sh not found or not executable."
   fi
 fi
 

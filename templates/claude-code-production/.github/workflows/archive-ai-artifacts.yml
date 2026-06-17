@@ -1,0 +1,75 @@
+name: Archive AI Artifacts
+
+on:
+  push:
+    tags:
+      - "v*"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive-ai-artifacts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="manual-$(date +%Y%m%d-%H%M%S)"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "ARCHIVE_NAME=ai-workspace-$VERSION.zip" >> "$GITHUB_ENV"
+
+      - name: Create archive
+        shell: bash
+        run: |
+          mkdir -p archive-build
+
+          for path in \
+            ".ai-workspace" \
+            "work-items" \
+            "docs/architecture" \
+            "docs/domain" \
+            "docs/decisions" \
+            "docs/operations" \
+            "CLAUDE.md" \
+            "AGENTS.md" \
+            "HARNESS-GUIDE.md"; do
+            if [ -e "$path" ]; then
+              cp -R "$path" archive-build/
+            fi
+          done
+
+          cd archive-build
+          zip -r "../$ARCHIVE_NAME" .
+
+      - name: Upload GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 90
+
+      # Optional S3 upload.
+      # Configure AWS role and bucket before enabling. If you use OIDC, grant
+      # the workflow token write permission under top-level permissions.
+      #
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ secrets.AWS_ARCHIVE_ROLE_ARN }}
+      #     aws-region: ap-northeast-2
+      #
+      # - name: Upload to S3
+      #   run: |
+      #     aws s3 cp "$ARCHIVE_NAME" \
+      #       "s3://${{ secrets.AI_ARTIFACT_BUCKET }}/${{ github.repository }}/releases/${VERSION}/${ARCHIVE_NAME}"

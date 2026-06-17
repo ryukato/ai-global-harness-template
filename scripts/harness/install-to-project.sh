@@ -11,6 +11,8 @@ DRY_RUN=false
 INSTALL_MODE="safe"
 BACKUP_DIR=""
 AGENT_TARGETS="codex"
+MIXED_FRONTEND_LANG="typescript"
+MIXED_BACKEND_LANG="typescript"
 
 print_usage() {
   cat <<'USAGE'
@@ -31,11 +33,19 @@ Profiles:
 Options:
   --init-scaffold       Create profile-specific minimal project files before installing the harness.
                         Supported for: typescript, python-poetry, python-uv,
-                        jvm-gradle-java, jvm-gradle-kotlin,
+                        mixed, jvm-gradle-java, jvm-gradle-kotlin,
                         jvm-maven-java, jvm-maven-kotlin.
                         Use this for empty or throwaway projects, not normal existing repos.
 
   --force-init          Allow init scaffold to overwrite existing scaffold files.
+
+  --frontend-lang <lang>
+                        Frontend language for --profile mixed --init-scaffold.
+                        Supported: typescript. Default: typescript.
+
+  --backend-lang <lang>
+                        Backend language for --profile mixed --init-scaffold.
+                        Supported: typescript. Default: typescript.
 
   --mode <mode>         How to handle existing harness target files.
                         safe       Default. Do not overwrite existing files. Write incoming files as *.harness-new.
@@ -43,9 +53,9 @@ Options:
                         overwrite  Overwrite existing files directly.
 
   --agent <agent>       Agent entrypoint to install.
-                        codex       Default. Install AGENTS.md.
-                        claude-code Install CLAUDE.md.
-                        both        Install both AGENTS.md and CLAUDE.md.
+                        codex       Default. Install AGENTS.md plus Codex docs/scripts.
+                        claude-code Install CLAUDE.md plus the Claude Code production harness.
+                        both        Install both Codex and Claude Code harnesses.
 
   --dry-run             Print what would happen without writing files.
 
@@ -60,6 +70,9 @@ Examples:
 
   # Empty TypeScript test project: create scaffold + harness
   ./scripts/harness/install-to-project.sh /tmp/dummy-ts --profile typescript --init-scaffold
+
+  # Empty mixed monorepo: create frontend/backend/libs + harness
+  ./scripts/harness/install-to-project.sh /tmp/dummy-mixed --profile mixed --init-scaffold --frontend-lang typescript --backend-lang typescript
 
   # Install both Codex and Claude Code entrypoints
   ./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent both
@@ -201,25 +214,11 @@ render_for_namespace() {
   local dst="$2"
   local namespace="$3"
 
-  if [ "$namespace" = "claude" ]; then
-    sed \
-      -e "s#docs/codex#docs/$namespace#g" \
-      -e "s#scripts/codex#scripts/$namespace#g" \
-      -e "s#\\.codex-runs#.$namespace-runs#g" \
-      -e "s#docs/$namespace/code-review.md#.claude/skills/code-review/SKILL.md#g" \
-      -e "s#docs/$namespace/legacy-project-guidance.md#.claude/skills/legacy-maintenance/SKILL.md#g" \
-      -e "s#docs/$namespace/atlassian-mcp.md#.claude/skills/atlassian-context/SKILL.md#g" \
-      -e "s#docs/$namespace/graphify.md#.claude/skills/graphify/SKILL.md#g" \
-      -e "s#docs/$namespace/dependency-fallback.md#.claude/skills/dependency-fallback/SKILL.md#g" \
-      -e "s#docs/$namespace/language-server.md#.claude/skills/language-server-setup/SKILL.md#g" \
-      "$src" > "$dst"
-  else
-    sed \
-      -e "s#docs/codex#docs/$namespace#g" \
-      -e "s#scripts/codex#scripts/$namespace#g" \
-      -e "s#\\.codex-runs#.$namespace-runs#g" \
-      "$src" > "$dst"
-  fi
+  sed \
+    -e "s#docs/codex#docs/$namespace#g" \
+    -e "s#scripts/codex#scripts/$namespace#g" \
+    -e "s#\\.codex-runs#.$namespace-runs#g" \
+    "$src" > "$dst"
 }
 
 write_rendered_file_from_source() {
@@ -241,14 +240,49 @@ copy_template_for_namespace() {
   write_rendered_file_from_source "$HARNESS_ROOT/$rel" "$TARGET_DIR/$dst_rel" "$namespace"
 }
 
-install_claude_project_skills() {
-  copy_template_for_namespace "templates/skills/claude/code-review/SKILL.md" ".claude/skills/code-review/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/legacy-maintenance/SKILL.md" ".claude/skills/legacy-maintenance/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/atlassian-context/SKILL.md" ".claude/skills/atlassian-context/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/graphify/SKILL.md" ".claude/skills/graphify/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/dependency-fallback/SKILL.md" ".claude/skills/dependency-fallback/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/language-server-setup/SKILL.md" ".claude/skills/language-server-setup/SKILL.md" "claude"
-  copy_template_for_namespace "templates/skills/claude/summarize-changes/SKILL.md" ".claude/skills/summarize-changes/SKILL.md" "claude"
+copy_template_tree() {
+  local rel="$1"
+  local dst_rel="$2"
+  local src_root="$HARNESS_ROOT/$rel"
+
+  [ -d "$src_root" ] || fail "Template directory not found: $rel"
+
+  while IFS= read -r -d '' src; do
+    local file_rel="${src#$src_root/}"
+    write_file_from_source "$src" "$TARGET_DIR/$dst_rel/$file_rel"
+  done < <(find "$src_root" -type f -print0 | sort -z)
+}
+
+install_claude_code_production_harness() {
+  local template_root="templates/claude-code-production"
+
+  if ! agent_target_enabled codex; then
+    copy_template "$template_root/AGENTS.md" "AGENTS.md"
+  fi
+
+  copy_template "$template_root/.gitignore" ".gitignore"
+  copy_template_tree "$template_root/.ai-workspace" ".ai-workspace"
+  copy_template_tree "$template_root/.claude" ".claude"
+  copy_template_tree "$template_root/scripts/claude" "scripts/claude"
+  copy_template_tree "$template_root/docs/architecture" "docs/architecture"
+  copy_template_tree "$template_root/docs/decisions" "docs/decisions"
+  copy_template_tree "$template_root/docs/domain" "docs/domain"
+  copy_template_tree "$template_root/docs/operations" "docs/operations"
+  write_generated_file "$TARGET_DIR/docs/operations/harness-profile.env" "HARNESS_PROFILE=$PROFILE
+"
+  copy_template_tree "$template_root/templates/jira" "templates/jira"
+  copy_template_tree "$template_root/templates/work-items" "templates/work-items"
+  copy_template_tree "$template_root/work-items" "work-items"
+
+  copy_template "$template_root/HARNESS-GUIDE.md" "HARNESS-GUIDE.md"
+
+  if [ -d "$HARNESS_ROOT/$template_root/.github" ]; then
+    copy_template_tree "$template_root/.github" ".github"
+  fi
+
+  if [ "$DRY_RUN" != true ]; then
+    chmod +x "$TARGET_DIR"/scripts/claude/*.sh 2>/dev/null || true
+  fi
 }
 
 agent_target_enabled() {
@@ -352,6 +386,8 @@ install_harness_namespace() {
   local scripts_dir="scripts/$namespace"
   local runs_dir=".$namespace-runs"
 
+  [ "$namespace" = "codex" ] || fail "Unsupported harness namespace: $namespace"
+
   copy_template_for_namespace "templates/docs/codex/project-context.md" "$docs_dir/project-context.md" "$namespace"
   if [ "$namespace" != "claude" ]; then
     copy_template_for_namespace "templates/docs/codex/code-review.md" "$docs_dir/code-review.md" "$namespace"
@@ -380,12 +416,7 @@ install_harness_namespace() {
     copy_template_for_namespace "templates/docs/codex/dependency-fallback.md" "$docs_dir/dependency-fallback.md" "$namespace"
   fi
   copy_template_for_namespace "templates/docs/codex/jvm-profiles.md" "$docs_dir/jvm-profiles.md" "$namespace"
-  if [ "$namespace" != "claude" ]; then
-    copy_template_for_namespace "templates/docs/codex/language-server.md" "$docs_dir/language-server.md" "$namespace"
-  else
-    copy_template_for_namespace "templates/docs/codex/claude-skills.md" "$docs_dir/claude-skills.md" "$namespace"
-    install_claude_project_skills
-  fi
+  copy_template_for_namespace "templates/docs/codex/language-server.md" "$docs_dir/language-server.md" "$namespace"
 
   write_generated_file "$TARGET_DIR/$docs_dir/harness-profile.env" "HARNESS_PROFILE=$PROFILE
 "
@@ -427,6 +458,14 @@ while [ "$#" -gt 0 ]; do
     --force-init)
       FORCE_INIT=true
       shift
+      ;;
+    --frontend-lang)
+      MIXED_FRONTEND_LANG="${2:-}"
+      shift 2
+      ;;
+    --backend-lang)
+      MIXED_BACKEND_LANG="${2:-}"
+      shift 2
       ;;
     --mode)
       INSTALL_MODE="${2:-}"
@@ -485,6 +524,9 @@ PROFILE_DIR="$HARNESS_ROOT/profiles/$PROFILE"
 
 if [ "$INIT_SCAFFOLD" = true ]; then
   INIT_ARGS=("$TARGET_DIR" "--profile" "$PROFILE")
+  if [ "$PROFILE" = "mixed" ]; then
+    INIT_ARGS+=("--frontend-lang" "$MIXED_FRONTEND_LANG" "--backend-lang" "$MIXED_BACKEND_LANG")
+  fi
   if [ "$FORCE_INIT" = true ]; then
     INIT_ARGS+=("--force")
   fi
@@ -512,7 +554,7 @@ fi
 
 if agent_target_enabled claude-code; then
   install_agent_entrypoint "CLAUDE.md" "templates/CLAUDE.base.md" "CLAUDE.md" "claude"
-  install_harness_namespace "claude"
+  install_claude_code_production_harness
 fi
 
 log ""
@@ -557,6 +599,7 @@ if agent_target_enabled codex; then
 fi
 
 if agent_target_enabled claude-code; then
-  log "  ./scripts/claude/bootstrap.sh --check"
   log "  ./scripts/claude/verify.sh"
+  log "  Review CLAUDE.md"
+  log "  Fill in docs/architecture/tech-stack.md and docs/domain/domain-model.md"
 fi

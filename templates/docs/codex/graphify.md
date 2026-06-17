@@ -20,12 +20,6 @@ Install/apply Graphify for Codex:
 ./scripts/codex/bootstrap.sh --apply --graphify --graphify-platform codex
 ```
 
-Install/apply Graphify for Claude Code:
-
-```bash
-./scripts/claude/bootstrap.sh --apply --graphify --graphify-platform default
-```
-
 Install/apply Graphify for OpenCode:
 
 ```bash

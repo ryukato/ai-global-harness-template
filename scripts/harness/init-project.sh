@@ -2,12 +2,15 @@
 set -euo pipefail
 
 HARNESS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROJECT_RESOURCES_ROOT="$HARNESS_ROOT/project-resources/templates"
 
 TARGET_DIR=""
 PROFILE=""
 FORCE=false
 INSTALL_HARNESS=false
 AGENT_TARGETS="codex"
+MIXED_FRONTEND_LANG="typescript"
+MIXED_BACKEND_LANG="typescript"
 
 print_usage() {
   cat <<'USAGE'
@@ -18,6 +21,7 @@ Profiles:
   typescript
   python-poetry
   python-uv
+  mixed
   jvm-gradle-java
   jvm-gradle-kotlin
   jvm-maven-java
@@ -25,15 +29,22 @@ Profiles:
 
 
 Options:
-  --install-harness  Also install agent entrypoint files, namespaced docs/scripts,
-                     and Claude project skills when --agent claude-code or both is used.
+  --install-harness  Also install selected agent harness files. Codex installs namespaced
+                     docs/scripts; Claude Code installs the production harness assets.
   --agent <agent>    Agent entrypoint to install when --install-harness is used.
                      codex, claude-code, or both. Default: codex.
+  --frontend-lang <lang>
+                     Frontend language for --profile mixed. Supported: typescript.
+                     Default: typescript.
+  --backend-lang <lang>
+                     Backend language for --profile mixed. Supported: typescript.
+                     Default: typescript.
   --force            Overwrite scaffold files if they already exist.
   -h, --help         Show this help.
 
 Examples:
   ./scripts/harness/init-project.sh /tmp/dummy-ts --profile typescript --install-harness
+  ./scripts/harness/init-project.sh /tmp/dummy-mixed --profile mixed --frontend-lang typescript --backend-lang typescript --install-harness
   ./scripts/harness/init-project.sh /tmp/dummy-kotlin-gradle --profile jvm-gradle-kotlin --install-harness
   ./scripts/harness/init-project.sh /tmp/dummy-java-maven --profile jvm-maven-java --install-harness
 USAGE
@@ -52,6 +63,36 @@ write_file() {
 
   printf "%s" "$content" > "$target"
   echo "Created: $target"
+}
+
+copy_resource_file() {
+  local source="$1"
+  local target="$2"
+
+  mkdir -p "$(dirname "$target")"
+
+  if [ -f "$target" ] && [ "$FORCE" != true ]; then
+    echo "Skip existing: $target"
+    return 0
+  fi
+
+  cp "$source" "$target"
+  echo "Created: $target"
+}
+
+copy_resource_tree() {
+  local source_dir="$1"
+  local target_dir="$2"
+
+  if [ ! -d "$source_dir" ]; then
+    echo "Resource template directory not found: $source_dir" >&2
+    exit 1
+  fi
+
+  while IFS= read -r -d '' source; do
+    local rel="${source#$source_dir/}"
+    copy_resource_file "$source" "$target_dir/$rel"
+  done < <(find "$source_dir" -type f -print0 | sort -z)
 }
 
 init_typescript() {
@@ -107,6 +148,7 @@ Keep runnable app code in `apps/`. Keep shared contracts and utilities in `libs/
     "typescript-language-server": "^4.0.0"
   }
 }
+
 '
 
   write_file "$TARGET_DIR/pnpm-workspace.yaml" 'packages:
@@ -334,16 +376,71 @@ pnpm --dir libs/utils run build
 Keep reusable, dependency-light helpers here. Do not add app-specific behavior or generated output.
 '
 
-  write_file "$TARGET_DIR/.gitignore" 'node_modules/
+  write_file "$TARGET_DIR/.gitignore" '.DS_Store
+.env
+.env.*
+!.env.example
+
+node_modules/
 dist/
+build/
 coverage/
 *.tsbuildinfo
-.env
-.DS_Store
-graphify-out/cache/
-.codex-runs/*
-!.codex-runs/.gitkeep
+
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+target/
+.gradle/
+
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+*.log
+*.tmp
+
+.ai-workspace/active/*
+!.ai-workspace/active/.gitkeep
 '
+}
+
+init_mixed() {
+  case "$MIXED_FRONTEND_LANG" in
+    typescript|ts)
+      MIXED_FRONTEND_LANG="typescript"
+      ;;
+    *)
+      echo "Unsupported --frontend-lang for mixed scaffold: $MIXED_FRONTEND_LANG" >&2
+      echo "Supported frontend languages: typescript" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$MIXED_BACKEND_LANG" in
+    typescript|ts)
+      MIXED_BACKEND_LANG="typescript"
+      ;;
+    *)
+      echo "Unsupported --backend-lang for mixed scaffold: $MIXED_BACKEND_LANG" >&2
+      echo "Supported backend languages: typescript" >&2
+      exit 1
+      ;;
+  esac
+
+  echo "Initializing mixed monorepo scaffold"
+  echo "Frontend language: $MIXED_FRONTEND_LANG"
+  echo "Backend language: $MIXED_BACKEND_LANG"
+
+  copy_resource_tree "$PROJECT_RESOURCES_ROOT/mixed/root/typescript" "$TARGET_DIR"
+  copy_resource_tree "$PROJECT_RESOURCES_ROOT/mixed/frontend/typescript" "$TARGET_DIR/apps/frontend"
+  copy_resource_tree "$PROJECT_RESOURCES_ROOT/mixed/backend/typescript" "$TARGET_DIR/apps/backend"
+  copy_resource_tree "$PROJECT_RESOURCES_ROOT/mixed/libs/typescript/types" "$TARGET_DIR/libs/types"
+  copy_resource_tree "$PROJECT_RESOURCES_ROOT/mixed/libs/typescript/utils" "$TARGET_DIR/libs/utils"
 }
 
 init_python_poetry() {
@@ -1416,6 +1513,14 @@ while [ "$#" -gt 0 ]; do
       AGENT_TARGETS="${2:-}"
       shift 2
       ;;
+    --frontend-lang)
+      MIXED_FRONTEND_LANG="${2:-}"
+      shift 2
+      ;;
+    --backend-lang)
+      MIXED_BACKEND_LANG="${2:-}"
+      shift 2
+      ;;
     --force)
       FORCE=true
       shift
@@ -1459,6 +1564,9 @@ case "$PROFILE" in
   python-uv)
     init_python_uv
     ;;
+  mixed)
+    init_mixed
+    ;;
   jvm-gradle-java)
     init_jvm_gradle_java
     ;;
@@ -1473,7 +1581,7 @@ case "$PROFILE" in
     ;;
   *)
     echo "Profile '$PROFILE' does not support project scaffold initialization." >&2
-    echo "Supported init profiles: typescript, python-poetry, python-uv, jvm-gradle-java, jvm-gradle-kotlin, jvm-maven-java, jvm-maven-kotlin" >&2
+    echo "Supported init profiles: typescript, python-poetry, python-uv, mixed, jvm-gradle-java, jvm-gradle-kotlin, jvm-maven-java, jvm-maven-kotlin" >&2
     exit 1
     ;;
 esac
@@ -1513,14 +1621,16 @@ if [ "$INSTALL_HARNESS" = true ]; then
       echo "  ./scripts/codex/verify.sh"
       ;;
     claude-code)
-      echo "  ./scripts/claude/bootstrap.sh --check"
       echo "  ./scripts/claude/verify.sh"
+      echo "  Review CLAUDE.md"
+      echo "  Fill in docs/architecture/tech-stack.md and docs/domain/domain-model.md"
       ;;
     both)
       echo "  ./scripts/codex/bootstrap.sh --check"
       echo "  ./scripts/codex/verify.sh"
-      echo "  ./scripts/claude/bootstrap.sh --check"
       echo "  ./scripts/claude/verify.sh"
+      echo "  Review CLAUDE.md"
+      echo "  Fill in docs/architecture/tech-stack.md and docs/domain/domain-model.md"
       ;;
   esac
 fi

@@ -133,10 +133,10 @@ Keep runnable app code in `apps/`. Keep shared contracts and utilities in `libs/
   "packageManager": "pnpm@9.15.0",
   "type": "module",
   "scripts": {
-    "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test",
-    "build": "pnpm -r run build"
+    "lint": "corepack pnpm@9.15.0 -r run lint",
+    "typecheck": "corepack pnpm@9.15.0 -r run typecheck",
+    "test": "corepack pnpm@9.15.0 -r run test",
+    "build": "corepack pnpm@9.15.0 -r run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

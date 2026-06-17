@@ -97,7 +97,58 @@ node_script_requires_bin() {
   grep -Eq "\"$script_name\"[[:space:]]*:[^\n]*$bin_name" "$package_dir/package.json"
 }
 
+package_manager_from_package_json() {
+  [ -f "package.json" ] || return 1
+  command -v node >/dev/null 2>&1 || return 1
+
+  node -e "
+    try {
+      const p = require('./package.json');
+      process.stdout.write(p.packageManager || '');
+    } catch (_) {}
+  " 2>/dev/null
+}
+
+corepack_has_runner() {
+  local runner="$1"
+
+  command -v corepack >/dev/null 2>&1 || return 1
+  corepack "$runner" --version >/dev/null 2>&1
+}
+
 detect_node_runner() {
+  local declared_pm
+  declared_pm="$(package_manager_from_package_json || true)"
+
+  case "$declared_pm" in
+    pnpm|pnpm@*)
+      if corepack_has_runner "$declared_pm"; then
+        echo "corepack:$declared_pm"
+        return 0
+      fi
+      if command -v pnpm >/dev/null 2>&1; then
+        echo "pnpm"
+        return 0
+      fi
+      ;;
+    yarn|yarn@*)
+      if corepack_has_runner "$declared_pm"; then
+        echo "corepack:$declared_pm"
+        return 0
+      fi
+      if command -v yarn >/dev/null 2>&1; then
+        echo "yarn"
+        return 0
+      fi
+      ;;
+    npm)
+      if command -v npm >/dev/null 2>&1; then
+        echo "npm"
+        return 0
+      fi
+      ;;
+  esac
+
   if [ -f "pnpm-lock.yaml" ] || [ -f "pnpm-workspace.yaml" ]; then
     if command -v pnpm >/dev/null 2>&1; then
       echo "pnpm"
@@ -120,6 +171,29 @@ detect_node_runner() {
   fi
 
   echo ""
+}
+
+describe_node_runner() {
+  case "$1" in
+    corepack:*)
+      echo "corepack ${1#corepack:}"
+      ;;
+    *)
+      echo "$1"
+      ;;
+  esac
+}
+
+warn_global_package_manager_fallback() {
+  local runner="$1"
+  local declared_pm
+  local declared_name
+  declared_pm="$(package_manager_from_package_json || true)"
+  declared_name="${declared_pm%%@*}"
+
+  if [ -n "$declared_name" ] && [ "$declared_name" = "$runner" ] && ! command -v corepack >/dev/null 2>&1; then
+    echo "WARN: package.json declares packageManager=$declared_pm, but corepack is unavailable. Falling back to global $runner." >&2
+  fi
 }
 
 iter_node_package_dirs() {
@@ -172,10 +246,23 @@ ensure_node_deps() {
   section "Installing Node dependencies"
 
   case "$runner" in
+    corepack:pnpm|corepack:pnpm@*)
+      local corepack_pm="${runner#corepack:}"
+      if [ -f "pnpm-lock.yaml" ]; then
+        if ! run_cmd_or_return "corepack $corepack_pm install --frozen-lockfile" corepack "$corepack_pm" install --frozen-lockfile; then
+          echo "Frozen pnpm install failed. Trying normal corepack $corepack_pm install as fallback."
+          run_cmd "corepack $corepack_pm install" corepack "$corepack_pm" install
+        fi
+      else
+        run_cmd "corepack $corepack_pm install" corepack "$corepack_pm" install
+      fi
+      ;;
     pnpm)
+      warn_global_package_manager_fallback "$runner"
       if [ -f "pnpm-lock.yaml" ]; then
         if ! run_cmd_or_return "pnpm install --frozen-lockfile" pnpm install --frozen-lockfile; then
           echo "Frozen pnpm install failed. Trying normal pnpm install as fallback."
+          echo "If global pnpm is incompatible with the active Node version, try: corepack pnpm install --frozen-lockfile"
           run_cmd "pnpm install" pnpm install
         fi
       else
@@ -192,7 +279,19 @@ ensure_node_deps() {
         run_cmd "npm install" npm install
       fi
       ;;
+    corepack:yarn|corepack:yarn@*)
+      local corepack_pm="${runner#corepack:}"
+      if [ -f "yarn.lock" ]; then
+        if ! run_cmd_or_return "corepack $corepack_pm install --frozen-lockfile" corepack "$corepack_pm" install --frozen-lockfile; then
+          echo "yarn frozen install failed. Trying corepack $corepack_pm install as fallback."
+          run_cmd "corepack $corepack_pm install" corepack "$corepack_pm" install
+        fi
+      else
+        run_cmd "corepack $corepack_pm install" corepack "$corepack_pm" install
+      fi
+      ;;
     yarn)
+      warn_global_package_manager_fallback "$runner"
       if [ -f "yarn.lock" ]; then
         if ! run_cmd_or_return "yarn install --frozen-lockfile" yarn install --frozen-lockfile; then
           echo "yarn frozen install failed. Trying yarn install as fallback."
@@ -221,10 +320,20 @@ run_node_script() {
   local runner="$2"
   local script="$3"
 
-  if [ "$runner" = "pnpm" ]; then
+  if [[ "$runner" == corepack:pnpm* ]]; then
+    local corepack_pm="${runner#corepack:}"
+    run_cmd "$package_dir: $script" corepack "$corepack_pm" --dir "$package_dir" run "$script"
+  elif [ "$runner" = "pnpm" ]; then
     run_cmd "$package_dir: $script" pnpm --dir "$package_dir" run "$script"
   elif [ "$runner" = "npm" ]; then
     run_cmd "$package_dir: $script" npm --prefix "$package_dir" run "$script"
+  elif [[ "$runner" == corepack:yarn* ]]; then
+    local corepack_pm="${runner#corepack:}"
+    if [ "$package_dir" = "." ]; then
+      run_cmd "$package_dir: $script" corepack "$corepack_pm" run "$script"
+    else
+      run_cmd "$package_dir: $script" corepack "$corepack_pm" --cwd "$package_dir" run "$script"
+    fi
   elif [ "$runner" = "yarn" ]; then
     if [ "$package_dir" = "." ]; then
       run_cmd "$package_dir: $script" yarn run "$script"
@@ -235,6 +344,37 @@ run_node_script() {
     echo "Unsupported Node runner: $runner" >&2
     mark_fail
   fi
+}
+
+warn_placeholder_test_script() {
+  local package_dir="$1"
+
+  [ -f "$package_dir/package.json" ] || return 0
+  command -v node >/dev/null 2>&1 || return 0
+
+  node -e "
+    const fs = require('fs');
+    const path = process.argv[1];
+    try {
+      const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+      const test = p.scripts && p.scripts.test;
+      process.exit(test && test.includes('No tests configured') ? 0 : 1);
+    } catch (_) {
+      process.exit(1);
+    }
+  " "$package_dir/package.json" >/dev/null 2>&1 || return 0
+
+  echo "WARN: $package_dir test script is a scaffold placeholder: No tests configured." >&2
+  echo "WARN: Placeholder tests are acceptable for bootstrapping, but they do not provide release confidence." >&2
+}
+
+warn_placeholder_test_scripts() {
+  local package_dir
+
+  warn_placeholder_test_script "."
+  while IFS= read -r package_dir; do
+    warn_placeholder_test_script "$package_dir"
+  done < <(iter_node_package_dirs)
 }
 
 run_node_package_script_if_exists() {
@@ -266,11 +406,14 @@ run_node_checks() {
   fi
 
   echo "Detected Node runner: $runner"
+  echo "Node command: $(describe_node_runner "$runner")"
 
   if ! ensure_node_deps "$runner"; then
     echo "Skipping Node checks because dependencies are unavailable."
     return 0
   fi
+
+  warn_placeholder_test_scripts
 
   for script in lint typecheck test build; do
     if has_package_script "." "$script"; then
@@ -293,6 +436,65 @@ run_node_checks() {
       run_node_package_script_if_exists "$package_dir" "$runner" "$script" || true
     done < <(iter_node_package_dirs)
   done
+}
+
+validate_frontmatter_file() {
+  local file="$1"
+  local first_line
+
+  [ -f "$file" ] || return 0
+
+  first_line="$(sed -n '1p' "$file")"
+  if [ "$first_line" != "---" ]; then
+    echo "FAIL: $file missing YAML frontmatter opening line." >&2
+    mark_fail
+    return 0
+  fi
+
+  local frontmatter_status
+  set +e
+  awk '
+    NR == 1 { next }
+    /^---$/ { exit }
+    /^name:[[:space:]]*[^[:space:]]/ { name = 1 }
+    /^description:[[:space:]]*./ { description = 1 }
+    END {
+      if (!name) exit 2
+      if (!description) exit 3
+    }
+  ' "$file"
+  frontmatter_status="$?"
+  set -e
+
+  case "$frontmatter_status" in
+    0)
+      ;;
+    2)
+      echo "FAIL: $file frontmatter missing name." >&2
+      mark_fail
+      ;;
+    3)
+      echo "FAIL: $file frontmatter missing description." >&2
+      mark_fail
+      ;;
+  esac
+}
+
+run_frontmatter_checks() {
+  local found=false
+  local file
+
+  section "Agent and skill frontmatter checks"
+
+  for file in .claude/agents/*.md .claude/skills/*/SKILL.md .agents/skills/*/SKILL.md; do
+    [ -e "$file" ] || continue
+    found=true
+    validate_frontmatter_file "$file"
+  done
+
+  if [ "$found" = false ]; then
+    echo "No Claude/agent skill files found for frontmatter checks."
+  fi
 }
 
 poetry_env_missing() {
@@ -616,6 +818,8 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   echo "Not a git repository. Skipping git status."
 fi
+
+run_frontmatter_checks
 
 case "$HARNESS_PROFILE" in
   typescript)

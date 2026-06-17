@@ -33,7 +33,12 @@ docs/codex/code-review.md
 docs/codex/code-review.md.harness-new
 ```
 
-Review and merge these manually.
+Review and merge these manually:
+
+- Compare each `*.harness-new` file with the existing project file.
+- Merge useful template content into the real file.
+- Delete or intentionally keep each `*.harness-new` file.
+- Do not leave unresolved template placeholders in committed docs.
 
 ## Backup Mode
 
@@ -156,7 +161,7 @@ docs/codex/atlassian-mcp.md
 # 3. Review incoming conflicts
 find /path/to/existing-project -name "*.harness-new" -print
 
-# 4. Manually merge if needed
+# 4. Compare, merge, and delete or intentionally keep each conflict artifact
 
 # 5. Check
 cd /path/to/existing-project

@@ -28,11 +28,20 @@ It treats dependencies as missing when:
 Install behavior:
 
 ```text
+package.json packageManager -> prefer corepack <manager>
 pnpm-lock.yaml or pnpm-workspace.yaml -> pnpm install --frozen-lockfile, fallback to pnpm install
 package-lock.json -> npm ci, fallback to npm install
 yarn.lock -> yarn install --frozen-lockfile, fallback to yarn install
 no lockfile -> package manager install
 ```
+
+When `package.json` declares `packageManager`, verification prefers Corepack so the project-selected package-manager version is used. If Corepack is unavailable and the script falls back to a global package manager, it prints a warning. If global `pnpm` is incompatible with the active Node runtime, try:
+
+```bash
+corepack pnpm install --frozen-lockfile
+```
+
+`verify.sh` also warns when a `test` script is only a scaffold placeholder such as `echo 'No tests configured for cli'`. That command may pass for bootstrapping, but it is not release confidence.
 
 ## Python Poetry
 

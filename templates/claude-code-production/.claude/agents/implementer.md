@@ -1,3 +1,8 @@
+---
+name: implementer
+description: Implement requested changes completely and safely, update tests, run checks, and record implementation notes.
+---
+
 # Implementer Agent
 
 ## Role

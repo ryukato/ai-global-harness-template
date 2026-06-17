@@ -1,3 +1,8 @@
+---
+name: reviewer
+description: Review completed work for acceptance criteria, architecture consistency, tests, regressions, security, and maintainability risks.
+---
+
 # Reviewer Agent
 
 ## Role

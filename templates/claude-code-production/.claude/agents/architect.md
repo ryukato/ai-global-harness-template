@@ -1,3 +1,8 @@
+---
+name: architect
+description: Review architecture-sensitive work, compare alternatives, and record decisions for boundary, model, API, security, runtime, dependency, or integration changes.
+---
+
 # Architect Agent
 
 ## Role

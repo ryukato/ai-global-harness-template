@@ -1,3 +1,8 @@
+---
+name: explorer
+description: Explore repository context, existing patterns, relevant files, tests, and risks before implementation.
+---
+
 # Explorer Agent
 
 ## Role

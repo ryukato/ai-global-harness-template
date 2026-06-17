@@ -101,9 +101,11 @@ Checks only git.
 
 Runs only Node/TypeScript verification.
 
-It detects package manager from lockfiles:
+It prefers `package.json` `packageManager` through Corepack when declared, then falls back to lockfile detection:
 
 ```text
+packageManager: pnpm@... -> corepack pnpm
+packageManager: yarn@... -> corepack yarn
 pnpm-lock.yaml / pnpm-workspace.yaml -> pnpm
 yarn.lock -> yarn
 package-lock.json / package.json -> npm
@@ -117,6 +119,8 @@ typecheck
 test
 build
 ```
+
+If a `test` script contains a scaffold placeholder such as `No tests configured`, verification prints a warning. Passing placeholder tests are acceptable for initial scaffold bootstrapping but not enough for release readiness.
 
 If root scripts exist, package-level `apps/*`, `libs/*`, `packages/*`, `services/*` checks are skipped by default to avoid duplicate recursive checks.
 

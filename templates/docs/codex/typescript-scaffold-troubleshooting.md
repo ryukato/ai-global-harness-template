@@ -55,7 +55,7 @@ git init
 
 ## Duplicate package-level checks
 
-Root scripts such as `pnpm -r run lint` already run workspace package scripts.
+Root scripts such as `corepack pnpm@9.15.0 -r run lint` already run workspace package scripts.
 
 The default `verify.sh` avoids running direct app/lib checks again when root scripts exist.
 

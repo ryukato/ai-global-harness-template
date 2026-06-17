@@ -2,7 +2,7 @@
 
 ## Project Name
 
-TODO: Fill in the project name.
+{{PROJECT_NAME}}
 
 ## Purpose
 
@@ -32,7 +32,7 @@ TODO: Select and describe the stack and harness profile.
 Selected harness profile:
 
 ```text
-TODO: typescript | python-poetry | python-uv | jvm-gradle-java | jvm-gradle-kotlin | jvm-maven-java | jvm-maven-kotlin | mixed | docs-only | auto
+{{SELECTED_HARNESS_PROFILE}}
 ```
 
 Examples:
@@ -47,7 +47,7 @@ Examples:
 ## Repository Structure
 
 ```text
-TODO: Add the important directories.
+{{REPOSITORY_STRUCTURE}}
 ```
 
 ## App / Package Layout
@@ -62,6 +62,21 @@ apps/web                 TODO: purpose
 apps/proxy-api           TODO: optional; only if this project uses a proxy/BFF-lite layer
 packages/shared-contracts TODO: optional shared request/response contracts
 libs/common              TODO: optional shared library
+```
+
+## Product Surfaces
+
+Explicitly separate active code from placeholders so agents do not expand unused surfaces into unrequested features.
+
+```text
+Active product surfaces:
+TODO: e.g. apps/cli, apps/web, services/api
+
+Reserved placeholders:
+TODO: e.g. apps/backend, apps/frontend
+
+Out-of-scope surfaces:
+TODO: e.g. Do not add backend/frontend behavior unless explicitly requested.
 ```
 
 ## Architecture Boundaries
@@ -94,13 +109,13 @@ api/domain -> no dependency on framework or infrastructure adapters
 
 ```bash
 # Setup
-TODO
+{{SETUP_COMMANDS}}
 
 # Verify
 ./scripts/codex/verify.sh
 
 # Test
-TODO
+{{TEST_COMMANDS}}
 ```
 
 ## Domain Notes
@@ -145,7 +160,11 @@ Examples:
 
 - Python version is declared at root `.python-version`.
 - Python sub-apps inherit the root Python version unless explicitly documented.
-- Node package manager is chosen by the existing lockfile or workspace config.
+- Node package manager:
+
+```text
+{{PACKAGE_MANAGER}}
+```
 
 ## Optional Proxy / BFF-Lite Usage
 
@@ -212,12 +231,14 @@ Examples:
 ## Generated Files / Paths to Avoid
 
 ```text
-TODO
+TODO: Decide which project-generated paths are ignored, committed, or reviewed case by case.
 ```
 
 Common examples:
 
 ```text
+.codex-runs/
+.ai-workspace/archive/
 dist/
 build/
 coverage/
@@ -231,6 +252,9 @@ target/
 .gradle/
 *.tsbuildinfo
 graphify-out/cache/
+reports/
+reports/raw/
+*.harness-new
 ```
 
 ## Additional Project References

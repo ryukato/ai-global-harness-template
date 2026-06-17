@@ -240,6 +240,206 @@ copy_template_for_namespace() {
   write_rendered_file_from_source "$HARNESS_ROOT/$rel" "$TARGET_DIR/$dst_rel" "$namespace"
 }
 
+detect_project_name() {
+  if [ -f "$TARGET_DIR/package.json" ] && command -v node >/dev/null 2>&1; then
+    local package_name
+    package_name="$(cd "$TARGET_DIR" && node -e "try { const p = require('./package.json'); process.stdout.write(p.name || ''); } catch (_) {}" 2>/dev/null || true)"
+    if [ -n "$package_name" ]; then
+      echo "$package_name"
+      return 0
+    fi
+  fi
+
+  if [ -f "$TARGET_DIR/README.md" ]; then
+    local heading
+    heading="$(sed -n 's/^# \{1,\}//p' "$TARGET_DIR/README.md" | head -n 1)"
+    if [ -n "$heading" ]; then
+      echo "$heading"
+      return 0
+    fi
+  fi
+
+  basename "$TARGET_DIR"
+}
+
+detect_package_manager() {
+  if [ -f "$TARGET_DIR/package.json" ] && command -v node >/dev/null 2>&1; then
+    local declared_pm
+    declared_pm="$(cd "$TARGET_DIR" && node -e "try { const p = require('./package.json'); process.stdout.write(p.packageManager || ''); } catch (_) {}" 2>/dev/null || true)"
+    if [ -n "$declared_pm" ]; then
+      echo "$declared_pm"
+      return 0
+    fi
+  fi
+
+  if [ -f "$TARGET_DIR/pnpm-lock.yaml" ] || [ -f "$TARGET_DIR/pnpm-workspace.yaml" ]; then
+    echo "pnpm (detected from pnpm lock/workspace file)"
+  elif [ -f "$TARGET_DIR/yarn.lock" ]; then
+    echo "yarn (detected from yarn.lock)"
+  elif [ -f "$TARGET_DIR/package-lock.json" ]; then
+    echo "npm (detected from package-lock.json)"
+  elif [ -f "$TARGET_DIR/package.json" ]; then
+    echo "npm (fallback for package.json without lockfile)"
+  elif [ -f "$TARGET_DIR/poetry.lock" ]; then
+    echo "poetry (detected from poetry.lock)"
+  elif [ -f "$TARGET_DIR/uv.lock" ]; then
+    echo "uv (detected from uv.lock)"
+  else
+    echo "TODO: record package manager or state that this project has none."
+  fi
+}
+
+detect_repository_structure() {
+  local found=false
+  local dir
+
+  for dir in apps services packages libs src docs scripts templates work-items .claude .github; do
+    if [ -d "$TARGET_DIR/$dir" ]; then
+      found=true
+      printf '%s/\n' "$dir"
+    fi
+  done
+
+  if [ "$found" = false ]; then
+    echo "TODO: Add the important directories. For existing repositories, prefer observed root directories over desired future structure."
+  fi
+}
+
+detect_setup_commands() {
+  if [ -f "$TARGET_DIR/package.json" ]; then
+    local pm
+    pm="$(detect_package_manager)"
+    case "$pm" in
+      pnpm@*)
+        echo "corepack $pm install"
+        return 0
+        ;;
+      pnpm*)
+        echo "corepack pnpm install"
+        return 0
+        ;;
+      yarn@*)
+        echo "corepack $pm install"
+        return 0
+        ;;
+      yarn*)
+        echo "corepack yarn install"
+        return 0
+        ;;
+      npm*|npm@*)
+        if [ -f "$TARGET_DIR/package-lock.json" ]; then
+          echo "npm ci"
+        else
+          echo "npm install"
+        fi
+        return 0
+        ;;
+    esac
+  fi
+
+  if [ -f "$TARGET_DIR/pyproject.toml" ] && [ -f "$TARGET_DIR/poetry.lock" ]; then
+    echo "poetry install"
+  elif [ -f "$TARGET_DIR/pyproject.toml" ] && [ -f "$TARGET_DIR/uv.lock" ]; then
+    echo "uv sync"
+  else
+    echo "TODO"
+  fi
+}
+
+detect_test_commands() {
+  if [ -f "$TARGET_DIR/package.json" ] && command -v node >/dev/null 2>&1; then
+    local run_prefix
+    local pm
+    pm="$(detect_package_manager)"
+    case "$pm" in
+      pnpm@*)
+        run_prefix="corepack $pm run"
+        ;;
+      pnpm*)
+        run_prefix="corepack pnpm run"
+        ;;
+      yarn@*)
+        run_prefix="corepack $pm run"
+        ;;
+      yarn*)
+        run_prefix="corepack yarn run"
+        ;;
+      *)
+        run_prefix="npm run"
+        ;;
+    esac
+
+    local scripts
+    scripts="$(cd "$TARGET_DIR" && node -e "
+      try {
+        const p = require('./package.json');
+        const prefix = process.argv[1];
+        const names = Object.keys(p.scripts || {});
+        const preferred = names.filter((name) => ['lint', 'typecheck', 'test', 'build'].includes(name));
+        process.stdout.write(preferred.map((name) => prefix + ' ' + name).join('\n'));
+      } catch (_) {}
+    " "$run_prefix" 2>/dev/null || true)"
+    if [ -n "$scripts" ]; then
+      echo "$scripts"
+      return 0
+    fi
+  fi
+
+  echo "TODO"
+}
+
+escape_newlines() {
+  awk '
+    {
+      gsub(/\\/, "\\\\")
+      printf "%s%s", separator, $0
+      separator = "\\n"
+    }
+  '
+}
+
+copy_project_context_for_namespace() {
+  local rel="$1"
+  local dst_rel="$2"
+  local namespace="$3"
+  local rendered
+  local tmp
+  local repository_structure
+  local setup_commands
+  local test_commands
+
+  rendered="$(mktemp)"
+  tmp="$(mktemp)"
+  render_for_namespace "$HARNESS_ROOT/$rel" "$rendered" "$namespace"
+  repository_structure="$(detect_repository_structure | escape_newlines)"
+  setup_commands="$(detect_setup_commands | escape_newlines)"
+  test_commands="$(detect_test_commands | escape_newlines)"
+
+  awk \
+    -v project_name="$(detect_project_name)" \
+    -v selected_profile="$PROFILE" \
+    -v repository_structure="$repository_structure" \
+    -v package_manager="$(detect_package_manager)" \
+    -v setup_commands="$setup_commands" \
+    -v test_commands="$test_commands" '
+      BEGIN {
+        gsub(/\\n/, "\n", repository_structure)
+        gsub(/\\n/, "\n", setup_commands)
+        gsub(/\\n/, "\n", test_commands)
+      }
+      $0 == "{{PROJECT_NAME}}" { print project_name; next }
+      $0 == "{{SELECTED_HARNESS_PROFILE}}" { print selected_profile; next }
+      $0 == "{{REPOSITORY_STRUCTURE}}" { print repository_structure; next }
+      $0 == "{{PACKAGE_MANAGER}}" { print package_manager; next }
+      $0 == "{{SETUP_COMMANDS}}" { print setup_commands; next }
+      $0 == "{{TEST_COMMANDS}}" { print test_commands; next }
+      { print }
+    ' "$rendered" > "$tmp"
+
+  write_file_from_source "$tmp" "$TARGET_DIR/$dst_rel"
+  rm -f "$rendered" "$tmp"
+}
+
 copy_template_tree() {
   local rel="$1"
   local dst_rel="$2"
@@ -388,7 +588,7 @@ install_harness_namespace() {
 
   [ "$namespace" = "codex" ] || fail "Unsupported harness namespace: $namespace"
 
-  copy_template_for_namespace "templates/docs/codex/project-context.md" "$docs_dir/project-context.md" "$namespace"
+  copy_project_context_for_namespace "templates/docs/codex/project-context.md" "$docs_dir/project-context.md" "$namespace"
   if [ "$namespace" != "claude" ]; then
     copy_template_for_namespace "templates/docs/codex/code-review.md" "$docs_dir/code-review.md" "$namespace"
   fi
@@ -563,7 +763,11 @@ if [ "$INSTALL_MODE" = "safe" ]; then
   log ""
   log "Safe mode note:"
   log "  Existing files were not overwritten."
-  log "  Review any *.harness-new files and merge manually if needed."
+  log "  Review any *.harness-new files:"
+  log "    1. Compare each conflict artifact with the existing project file."
+  log "    2. Merge useful template content into the real file."
+  log "    3. Delete or intentionally keep each *.harness-new file."
+  log "    4. Do not commit unresolved template placeholders."
 fi
 if [ "$INSTALL_MODE" = "backup" ] && [ -n "$BACKUP_DIR" ]; then
   log ""

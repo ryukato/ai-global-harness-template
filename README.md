@@ -258,7 +258,12 @@ Default installation mode is safe and does not overwrite existing files:
 ./scripts/harness/install-to-project.sh /path/to/existing-project --profile typescript
 ```
 
-Conflicts are written as `*.harness-new`.
+Conflicts are written as `*.harness-new`. After a safe install:
+
+- Compare each `*.harness-new` file with the existing project file.
+- Merge useful template content into the real file.
+- Delete or intentionally keep each `*.harness-new` file.
+- Do not commit unresolved template placeholders.
 
 Preview first:
 
@@ -313,7 +318,7 @@ docs/architecture/tech-stack.md    # --agent claude-code or both
 docs/domain/domain-model.md        # --agent claude-code or both
 ```
 
-to describe the target project.
+to describe the target project. `project-context.md` is prefilled with obvious local metadata when available, including project name, selected profile, package manager, root scripts, and observed top-level structure.
 
 For scaffold and architecture guidance, also review:
 
@@ -661,10 +666,12 @@ VERIFY_AUTO_INSTALL_DEPS=true
 Examples:
 
 ```text
-typescript     -> pnpm install / npm ci / yarn install when node_modules is missing
+typescript     -> corepack package manager / pnpm install / npm ci / yarn install when node_modules is missing
 python-poetry  -> POETRY_VIRTUALENVS_IN_PROJECT=true poetry install when .venv is missing
 python-uv      -> uv sync when .venv is missing
 ```
+
+For Node projects, `verify.sh` prefers Corepack when `package.json` declares `packageManager`. It also warns when test scripts are scaffold placeholders such as `No tests configured`.
 
 To disable dependency fallback:
 
@@ -730,4 +737,4 @@ jvm-*-java           -> jdtls
 jvm-*-kotlin         -> kotlin-language-server, ktlint
 ```
 
-Existing config files are not overwritten. Incoming config is written as `*.harness-new`.
+Existing config files are not overwritten. Incoming config is written as `*.harness-new`; compare, merge, and clean up those artifacts before committing generated docs.

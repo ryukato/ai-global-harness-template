@@ -64,10 +64,8 @@ The repository `.gitignore` should ignore:
 
 ```text
 .env
-.env.*
+.env.*        # covers `.env.local` and `.env.agent.local`
 !.env.example
-.env.agent
-.env.agent.*
 .secrets/
 ```
 

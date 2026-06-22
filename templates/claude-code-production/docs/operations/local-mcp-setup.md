@@ -55,7 +55,7 @@ Do not commit these items:
 - personal access tokens
 - generated local auth caches
 - `.env` files with credentials
-- `.env.agent*` files with credentials
+- `.env.*` files with credentials, except placeholder-only `.env.example`
 - `.secrets/` files or directories
 
 ## Recommended Developer Checklist

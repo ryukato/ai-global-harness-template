@@ -600,6 +600,8 @@ install_harness_namespace() {
   if [ "$namespace" != "claude" ]; then
     copy_template_for_namespace "templates/docs/codex/legacy-project-guidance.md" "$docs_dir/legacy-project-guidance.md" "$namespace"
     copy_template_for_namespace "templates/docs/codex/atlassian-mcp.md" "$docs_dir/atlassian-mcp.md" "$namespace"
+    copy_template_for_namespace "templates/docs/codex/local-mcp-setup.md" "$docs_dir/local-mcp-setup.md" "$namespace"
+    copy_template_for_namespace "templates/docs/codex/local-api-key-setup.md" "$docs_dir/local-api-key-setup.md" "$namespace"
   fi
   copy_template_for_namespace "templates/docs/codex/monorepo-layout.md" "$docs_dir/monorepo-layout.md" "$namespace"
   copy_template_for_namespace "templates/docs/codex/backend-architecture-boundaries.md" "$docs_dir/backend-architecture-boundaries.md" "$namespace"

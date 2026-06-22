@@ -8,6 +8,7 @@ It supports:
 
 - Jira-based work
 - Repository-local work items
+- CAWF-style plan, execute, review, and git commands
 - Project-specific tech stack guidance
 - Project-specific domain guidance
 - Implementation planning
@@ -28,11 +29,53 @@ It supports:
    - `domain-context`
    - `test-strategy`
 
+### GitHub-Based
+
+1. Put the requirement in a GitHub issue or PR description.
+2. Ask Claude Code to plan or implement from that GitHub source.
+3. Claude uses:
+   - `github-issue-analysis`
+   - `implementation-planning`
+   - `project-tech-stack`
+   - `domain-context`
+   - `test-strategy`
+
 ### Non-Jira
 
 1. Create `work-items/tasks/TASK-xxx.md`.
 2. Ask Claude Code to implement that work item.
 3. Keep domain/architecture context in `docs/*`, not inside every task.
+
+### CAWF Command Workflow
+
+For teams that want a stricter staged workflow, use the CAWF commands adapted
+from the internal coding-agent-wf POC:
+
+```text
+/project:cawf:plan <jira-url | github-url | work-item | request>
+/project:cawf:execute <TASK-ID | plan path>
+/project:cawf:review [origin/develop | origin/main]
+/project:cawf:git <TASK-ID>
+```
+
+These commands save versioned artifacts under:
+
+```text
+.ai-workspace/active/<TASK-ID>/outputs/
+```
+
+Use this flow when you want human-reviewable planning and execution records
+before commit or PR work.
+
+Jira/GitHub loading requires the matching connector, MCP server, or authenticated
+CLI in the user's Claude environment. This harness provides the reusable
+analysis workflow, not repository-committed credentials.
+See:
+
+```text
+docs/operations/local-api-key-setup.md
+docs/operations/local-mcp-setup.md
+```
 
 ## Right-Sized Ticket Principle
 

@@ -47,6 +47,16 @@ docs/codex/legacy-project-guidance.md
 docs/codex/atlassian-mcp.md
   Optional Jira and Confluence integration guidance through Atlassian Rovo MCP.
 
+docs/codex/local-mcp-setup.md
+docs/operations/local-mcp-setup.md
+  Local developer setup boundary for Atlassian/GitHub MCP, connectors, and CLI
+  authentication used by coding-agent commands.
+
+docs/codex/local-api-key-setup.md
+docs/operations/local-api-key-setup.md
+  Local developer setup boundary for API keys used by coding-agent providers,
+  GitHub tooling, MCP servers, or internal sandboxes.
+
 docs/architecture/
 docs/domain/
 docs/decisions/
@@ -61,11 +71,13 @@ docs/operations/
 .claude/agents/
 .claude/commands/
   Claude Code production harness role guidance and reusable slash-command prompts.
+  `.claude/commands/cawf/*` contains the plan, execute, review, and git
+  workflow adapted from the internal coding-agent-wf POC.
 
 .claude/skills/
-  Claude Code project skills for Jira analysis, implementation planning,
-  project tech-stack context, domain context, code review, test strategy,
-  release readiness, and agent workspace management.
+  Claude Code project skills for Jira/GitHub analysis, implementation
+  planning, project tech-stack context, domain context, code review, test
+  strategy, release readiness, and agent workspace management.
 
 docs/codex/monorepo-layout.md
 docs/codex/backend-architecture-boundaries.md
@@ -531,6 +543,7 @@ For Claude Code, stable project context lives under `docs/architecture/` and `do
 .claude/skills/code-review/SKILL.md
 .claude/skills/domain-context/SKILL.md
 .claude/skills/fix-bug/SKILL.md
+.claude/skills/github-issue-analysis/SKILL.md
 .claude/skills/implementation-planning/SKILL.md
 .claude/skills/jira-ticket-analysis/SKILL.md
 .claude/skills/project-tech-stack/SKILL.md
@@ -539,6 +552,50 @@ For Claude Code, stable project context lives under `docs/architecture/` and `do
 ```
 
 Claude Code project skills follow Anthropic's documented layout: `.claude/skills/<skill-name>/SKILL.md`. The skill frontmatter `description` tells Claude when to load the skill.
+
+Claude Code installs two command layers:
+
+```text
+.claude/commands/start-task.md
+.claude/commands/implement-feature.md
+.claude/commands/review-change.md
+.claude/commands/complete-task.md
+```
+
+These are lightweight harness-native commands.
+
+The internal CAWF-style workflow is also installed under `.claude/commands/cawf/`:
+
+```text
+/project:cawf:plan     -> analyze Jira/GitHub/work-item input and save plan-v<N>.md
+/project:cawf:execute  -> implement an approved plan and save execute-v<N>.md
+/project:cawf:review   -> review the current diff and save review-v<N>.md
+/project:cawf:git      -> prepare commit, push, and PR steps after approval
+```
+
+CAWF command outputs are written under:
+
+```text
+.ai-workspace/active/<TASK-ID>/outputs/
+```
+
+This keeps the POC's plan/execution/review discipline while using the production harness archive policy and workspace layout.
+
+Jira and GitHub source loading still depends on the target Claude runtime:
+
+```text
+Jira    -> Atlassian connector/MCP credentials must be configured.
+GitHub  -> GitHub connector/MCP or authenticated gh CLI must be configured.
+```
+
+The harness provides the analysis skills and command prompts; credentials and
+connector installation remain environment-specific and should not be committed.
+For the installed project guidance, see:
+
+```text
+docs/operations/local-api-key-setup.md
+docs/operations/local-mcp-setup.md
+```
 
 ## Legacy Project Mode
 
@@ -568,6 +625,18 @@ docs/domain/business-rules.md
 ## Atlassian Jira / Confluence MCP
 
 The harness includes optional guidance for connecting agents to Jira and Confluence through Atlassian's official Rovo MCP Server.
+
+Coding agents run in each developer's local environment, so Atlassian and
+GitHub connectors, MCP servers, OAuth sessions, and CLI credentials must be
+configured locally by each developer. The repository should contain only
+non-secret setup guidance. See:
+
+```text
+docs/codex/local-mcp-setup.md
+docs/codex/local-api-key-setup.md
+docs/operations/local-mcp-setup.md
+docs/operations/local-api-key-setup.md
+```
 
 The documented current remote endpoint is:
 

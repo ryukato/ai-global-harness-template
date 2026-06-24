@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.secrets/
+.mcp.json
+.mcp.local.json
+*.log
+*.tmp

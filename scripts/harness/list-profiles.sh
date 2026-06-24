@@ -11,6 +11,7 @@ jvm-gradle-kotlin
 jvm-maven-java
 jvm-maven-kotlin
 mixed
+planning-design
 python-poetry
 python-uv
 typescript

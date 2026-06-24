@@ -28,6 +28,7 @@ Profiles:
   jvm-maven-java
   jvm-maven-kotlin
   mixed
+  planning-design
   docs-only
 
 Options:
@@ -56,6 +57,7 @@ Options:
                         codex       Default. Install AGENTS.md plus Codex docs/scripts.
                         claude-code Install CLAUDE.md plus the Claude Code production harness.
                         both        Install both Codex and Claude Code harnesses.
+                        For planning-design, omit this option or use claude-code.
 
   --dry-run             Print what would happen without writing files.
 
@@ -73,6 +75,9 @@ Examples:
 
   # Empty mixed monorepo: create frontend/backend/libs + harness
   ./scripts/harness/install-to-project.sh /tmp/dummy-mixed --profile mixed --init-scaffold --frontend-lang typescript --backend-lang typescript
+
+  # Lightweight planning/design workspace
+  ./scripts/harness/install-to-project.sh /path/to/planning-space --profile planning-design
 
   # Install both Codex and Claude Code entrypoints
   ./scripts/harness/install-to-project.sh /path/to/project --profile typescript --agent both
@@ -124,8 +129,6 @@ write_file_from_source() {
   local src="$1"
   local dst="$2"
 
-  mkdir -p "$(dirname "$dst")"
-
   if [ "$DRY_RUN" = true ]; then
     if [ -f "$dst" ]; then
       case "$INSTALL_MODE" in
@@ -144,6 +147,8 @@ write_file_from_source() {
     fi
     return 0
   fi
+
+  mkdir -p "$(dirname "$dst")"
 
   if [ -f "$dst" ]; then
     if cmp -s "$src" "$dst"; then
@@ -485,6 +490,26 @@ install_claude_code_production_harness() {
   fi
 }
 
+install_planning_design_harness() {
+  local template_root="templates/planning-design"
+
+  [ -d "$HARNESS_ROOT/$template_root" ] || fail "Template directory not found: $template_root"
+
+  copy_template "$template_root/CLAUDE.md" "CLAUDE.md"
+  copy_template "$template_root/AGENTS.md" "AGENTS.md"
+  copy_template "$template_root/.gitignore" ".gitignore"
+  copy_template "$template_root/.mcp.example.json" ".mcp.example.json"
+  copy_template "$template_root/README.md" "README.md"
+  copy_template "$template_root/PLANNING-DESIGN-GUIDE.md" "PLANNING-DESIGN-GUIDE.md"
+  copy_template_tree "$template_root/.claude" ".claude"
+  copy_template_tree "$template_root/docs/planning" "docs/planning"
+  copy_template_tree "$template_root/docs/design" "docs/design"
+  copy_template_tree "$template_root/docs/operations" "docs/operations"
+  write_generated_file "$TARGET_DIR/docs/operations/harness-profile.env" "HARNESS_PROFILE=$PROFILE
+"
+  copy_template_tree "$template_root/templates" "templates"
+}
+
 agent_target_enabled() {
   local wanted="$1"
 
@@ -696,7 +721,7 @@ done
 [ -n "$PROFILE" ] || fail "Missing --profile"
 
 case "$PROFILE" in
-  typescript|python-poetry|python-uv|jvm-gradle-java|jvm-gradle-kotlin|jvm-maven-java|jvm-maven-kotlin|mixed|docs-only)
+  typescript|python-poetry|python-uv|jvm-gradle-java|jvm-gradle-kotlin|jvm-maven-java|jvm-maven-kotlin|mixed|planning-design|docs-only)
     ;;
   *)
     fail "Unknown profile: $PROFILE"
@@ -719,23 +744,42 @@ case "$AGENT_TARGETS" in
     ;;
 esac
 
-mkdir -p "$TARGET_DIR"
+if [ "$PROFILE" = "planning-design" ]; then
+  if [ "$AGENT_TARGETS" = "both" ]; then
+    fail "planning-design is a lightweight Claude-oriented profile. Omit --agent or use --agent claude-code."
+  fi
+  if [ "$AGENT_TARGETS" = "codex" ]; then
+    AGENT_TARGETS="claude-code"
+  fi
+fi
+
+if [ "$DRY_RUN" = true ]; then
+  if [ ! -d "$TARGET_DIR" ]; then
+    log "DRY-RUN create target directory: $TARGET_DIR"
+  fi
+else
+  mkdir -p "$TARGET_DIR"
+fi
 
 PROFILE_DIR="$HARNESS_ROOT/profiles/$PROFILE"
 [ -d "$PROFILE_DIR" ] || fail "Profile directory not found: $PROFILE_DIR"
 
 if [ "$INIT_SCAFFOLD" = true ]; then
-  INIT_ARGS=("$TARGET_DIR" "--profile" "$PROFILE")
-  if [ "$PROFILE" = "mixed" ]; then
-    INIT_ARGS+=("--frontend-lang" "$MIXED_FRONTEND_LANG" "--backend-lang" "$MIXED_BACKEND_LANG")
-  fi
-  if [ "$FORCE_INIT" = true ]; then
-    INIT_ARGS+=("--force")
-  fi
-  if [ "$DRY_RUN" = true ]; then
-    log "DRY-RUN: would run init-project.sh ${INIT_ARGS[*]}"
+  if [ "$PROFILE" = "planning-design" ]; then
+    log "Planning-design profile installs a lightweight document workspace; no application scaffold is generated."
   else
-    "$HARNESS_ROOT/scripts/harness/init-project.sh" "${INIT_ARGS[@]}"
+    INIT_ARGS=("$TARGET_DIR" "--profile" "$PROFILE")
+    if [ "$PROFILE" = "mixed" ]; then
+      INIT_ARGS+=("--frontend-lang" "$MIXED_FRONTEND_LANG" "--backend-lang" "$MIXED_BACKEND_LANG")
+    fi
+    if [ "$FORCE_INIT" = true ]; then
+      INIT_ARGS+=("--force")
+    fi
+    if [ "$DRY_RUN" = true ]; then
+      log "DRY-RUN: would run init-project.sh ${INIT_ARGS[*]}"
+    else
+      "$HARNESS_ROOT/scripts/harness/init-project.sh" "${INIT_ARGS[@]}"
+    fi
   fi
 fi
 
@@ -749,12 +793,14 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # Agent entrypoint files require special handling so profile rules can be included.
-if agent_target_enabled codex; then
+if [ "$PROFILE" = "planning-design" ]; then
+  install_planning_design_harness
+elif agent_target_enabled codex; then
   install_agent_entrypoint "AGENTS.md" "templates/AGENTS.base.md" "AGENTS.md" "codex"
   install_harness_namespace "codex"
 fi
 
-if agent_target_enabled claude-code; then
+if [ "$PROFILE" != "planning-design" ] && agent_target_enabled claude-code; then
   install_agent_entrypoint "CLAUDE.md" "templates/CLAUDE.base.md" "CLAUDE.md" "claude"
   install_claude_code_production_harness
 fi
@@ -799,12 +845,17 @@ case "$PROFILE" in
     ;;
 esac
 
-if agent_target_enabled codex; then
+if [ "$PROFILE" = "planning-design" ]; then
+  log "  Review CLAUDE.md"
+  log "  Fill in docs/planning/product-brief.md"
+  log "  Fill in docs/design/design-note-template.md"
+  log "  Configure local MCP/API keys from docs/operations/*.md"
+elif agent_target_enabled codex; then
   log "  ./scripts/codex/bootstrap.sh --check"
   log "  ./scripts/codex/verify.sh"
 fi
 
-if agent_target_enabled claude-code; then
+if [ "$PROFILE" != "planning-design" ] && agent_target_enabled claude-code; then
   log "  ./scripts/claude/verify.sh"
   log "  Review CLAUDE.md"
   log "  Fill in docs/architecture/tech-stack.md and docs/domain/domain-model.md"

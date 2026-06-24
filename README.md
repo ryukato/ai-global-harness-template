@@ -160,6 +160,7 @@ Create a new mixed frontend/backend monorepo from an empty directory:
 | `jvm-maven-java` | Java project managed by Maven | yes |
 | `jvm-maven-kotlin` | Kotlin project managed by Maven | yes |
 | `mixed` | Frontend/backend/libs monorepo or repository with multiple stacks | yes, TypeScript/TypeScript currently |
+| `planning-design` | Lightweight planning/design workspace for product, design, and Jira/Figma handoff | document workspace only |
 | `docs-only` | Documentation or planning repository with no application code | harness only |
 
 ### Agents
@@ -175,6 +176,11 @@ Default:
 ```text
 --agent codex
 ```
+
+For `--profile planning-design`, the default agent target is treated as
+`claude-code` because the lightweight workflow is built around Claude skills
+and agents. Use `--agent claude-code` explicitly if desired; `--agent both`
+is intentionally unsupported for this profile to keep the install lightweight.
 
 ### Existing File Modes
 
@@ -304,6 +310,27 @@ Both Codex and Claude Code:
 ./scripts/harness/install-to-project.sh /path/to/existing-project --profile mixed --agent both
 ```
 
+Planning/design workspace:
+
+```bash
+./scripts/harness/install-to-project.sh /path/to/planning-space --profile planning-design
+```
+
+This installs a lightweight document workspace for product briefs,
+requirements, Figma review, Jira issue drafting, and local MCP/API-key setup.
+It does not install application code, architecture docs, release archive
+workflows, or verification scripts.
+
+Reusable planning/design artifact templates are installed under:
+
+```text
+templates/planning/*
+templates/design/*
+templates/jira/*
+templates/qa/*
+templates/retrospective/*
+```
+
 
 ## After Installing Into a Project
 
@@ -315,14 +342,26 @@ cd /path/to/target-project
 ./scripts/codex/verify.sh
 ```
 
-For Claude Code installs, run:
+For Claude Code production harness installs, run:
 
 ```bash
 cd /path/to/target-project
 ./scripts/claude/verify.sh
 ```
 
-Then edit:
+For planning/design installs, start from:
+
+```text
+docs/planning/product-brief.md
+docs/planning/requirement-template.md
+docs/design/design-note-template.md
+docs/operations/local-mcp-setup.md
+docs/operations/local-api-key-setup.md
+```
+
+No application verification script is installed for `planning-design`.
+
+For development-oriented installs, then edit:
 
 ```text
 docs/codex/project-context.md      # --agent codex or both
